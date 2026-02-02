@@ -1,0 +1,15 @@
+fastapi
+uvicorn
+tortoise-orm
+asyncpg
+pydantic
+langchain
+langchain-community
+langchain-openai
+langgraph
+beautifulsoup4
+httpx
+pytest
+pytest-asyncio
+greenlet
+tavily-python
