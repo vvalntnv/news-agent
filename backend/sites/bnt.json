@@ -1,9 +1,23 @@
 {
   "scrapingUrl": "https://bntnews.bg/",
-  "articleContainers": [],
-  "titlesContainers": [],
-  "timestampsConteiners": [],
-  "summaryContainers": [],
-  "mainArticleContainer": "",
+  "articleContainers": [
+    ".top-news",
+    ".news-box-regular",
+    ".scroll-box"
+  ],
+  "titlesContainers": [
+    "h1.big-title a",
+    "a.medium-title",
+    "a.small-title",
+    ".scroll-box a"
+  ],
+  "timestampsConteiners": [
+    "time.news-time",
+    ".scroll-box time"
+  ],
+  "summaryContainers": [
+    ".sub-title"
+  ],
+  "mainArticleContainer": ".top-news-wrap",
   "authorContainer": ""
 }

@@ -27,8 +27,6 @@ class NewsExtractor(Protocol):
     Protocol that extracts the News from the News class
     """
 
-    news_site_domain: str
-
     async def extract_news_data(self) -> list[RawNewsData]:
         """
         Extracts the news raw data
