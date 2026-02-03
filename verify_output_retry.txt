@@ -1,0 +1,91 @@
+DEBUG:tortoise.db_client:INSERT INTO "article" ("article_url","created_at","media_id","news_data_id","raw_data_id") VALUES (?,?,?,?,?): ['http://test.com/article_partial', datetime.datetime(2026, 2, 3, 18, 7, 50, 398431, tzinfo=<UTC>), 1, None, None]
+DEBUG:aiosqlite:executing functools.partial(<bound method Connection._execute_insert of <aiosqlite.core.Connection object at 0x7f3565902e40>>, 'INSERT INTO "article" ("article_url","created_at","media_id","news_data_id","raw_data_id") VALUES (?,?,?,?,?)', ['http://test.com/article_partial', datetime.datetime(2026, 2, 3, 18, 7, 50, 398431, tzinfo=<UTC>), 1, None, None])
+DEBUG:aiosqlite:operation functools.partial(<bound method Connection._execute_insert of <aiosqlite.core.Connection object at 0x7f3565902e40>>, 'INSERT INTO "article" ("article_url","created_at","media_id","news_data_id","raw_data_id") VALUES (?,?,?,?,?)', ['http://test.com/article_partial', datetime.datetime(2026, 2, 3, 18, 7, 50, 398431, tzinfo=<UTC>), 1, None, None]) completed
+DEBUG:tortoise.db_client:INSERT INTO "article" ("article_url","created_at","media_id","news_data_id","raw_data_id") VALUES (?,?,?,?,?): ['http://test.com/article_partial_2', datetime.datetime(2026, 2, 3, 18, 7, 50, 399060, tzinfo=<UTC>), 1, 1, None]
+DEBUG:aiosqlite:executing functools.partial(<bound method Connection._execute_insert of <aiosqlite.core.Connection object at 0x7f3565902e40>>, 'INSERT INTO "article" ("article_url","created_at","media_id","news_data_id","raw_data_id") VALUES (?,?,?,?,?)', ['http://test.com/article_partial_2', datetime.datetime(2026, 2, 3, 18, 7, 50, 399060, tzinfo=<UTC>), 1, 1, None])
+DEBUG:aiosqlite:operation functools.partial(<bound method Connection._execute_insert of <aiosqlite.core.Connection object at 0x7f3565902e40>>, 'INSERT INTO "article" ("article_url","created_at","media_id","news_data_id","raw_data_id") VALUES (?,?,?,?,?)', ['http://test.com/article_partial_2', datetime.datetime(2026, 2, 3, 18, 7, 50, 399060, tzinfo=<UTC>), 1, 1, None]) completed
+DEBUG:tortoise.db_client:INSERT INTO "article" ("article_url","created_at","media_id","news_data_id","raw_data_id") VALUES (?,?,?,?,?): ['http://test.com/article', datetime.datetime(2026, 2, 3, 18, 7, 50, 399348, tzinfo=<UTC>), 1, 1, 1]
+DEBUG:aiosqlite:executing functools.partial(<bound method Connection._execute_insert of <aiosqlite.core.Connection object at 0x7f3565902e40>>, 'INSERT INTO "article" ("article_url","created_at","media_id","news_data_id","raw_data_id") VALUES (?,?,?,?,?)', ['http://test.com/article', datetime.datetime(2026, 2, 3, 18, 7, 50, 399348, tzinfo=<UTC>), 1, 1, 1])
+DEBUG:aiosqlite:operation functools.partial(<bound method Connection._execute_insert of <aiosqlite.core.Connection object at 0x7f3565902e40>>, 'INSERT INTO "article" ("article_url","created_at","media_id","news_data_id","raw_data_id") VALUES (?,?,?,?,?)', ['http://test.com/article', datetime.datetime(2026, 2, 3, 18, 7, 50, 399348, tzinfo=<UTC>), 1, 1, 1]) completed
+DEBUG:tortoise.db_client:SELECT "raw_data_id","media_id","article_url","id","news_data_id","created_at" FROM "article" WHERE "id"=? LIMIT ?: [3, 1]
+DEBUG:aiosqlite:executing functools.partial(<bound method Connection._execute_fetchall of <aiosqlite.core.Connection object at 0x7f3565902e40>>, 'SELECT "raw_data_id","media_id","article_url","id","news_data_id","created_at" FROM "article" WHERE "id"=? LIMIT ?', [3, 1])
+DEBUG:aiosqlite:operation functools.partial(<bound method Connection._execute_fetchall of <aiosqlite.core.Connection object at 0x7f3565902e40>>, 'SELECT "raw_data_id","media_id","article_url","id","news_data_id","created_at" FROM "article" WHERE "id"=? LIMIT ?', [3, 1]) completed
+DEBUG:tortoise.db_client:SELECT "name","site_url","id","trustworthiness","created_at" FROM "media" WHERE "id"=?: [1]
+DEBUG:aiosqlite:executing functools.partial(<bound method Connection._execute_fetchall of <aiosqlite.core.Connection object at 0x7f3565902e40>>, 'SELECT "name","site_url","id","trustworthiness","created_at" FROM "media" WHERE "id"=?', [1])
+DEBUG:aiosqlite:operation functools.partial(<bound method Connection._execute_fetchall of <aiosqlite.core.Connection object at 0x7f3565902e40>>, 'SELECT "name","site_url","id","trustworthiness","created_at" FROM "media" WHERE "id"=?', [1]) completed
+DEBUG:tortoise.db_client:SELECT "negative_opinion","positive_opinion","fact_check_summary","id","summary","fact_check_urls","created_at" FROM "news_data" WHERE "id"=?: [1]
+DEBUG:aiosqlite:executing functools.partial(<bound method Connection._execute_fetchall of <aiosqlite.core.Connection object at 0x7f3565902e40>>, 'SELECT "negative_opinion","positive_opinion","fact_check_summary","id","summary","fact_check_urls","created_at" FROM "news_data" WHERE "id"=?', [1])
+DEBUG:aiosqlite:operation functools.partial(<bound method Connection._execute_fetchall of <aiosqlite.core.Connection object at 0x7f3565902e40>>, 'SELECT "negative_opinion","positive_opinion","fact_check_summary","id","summary","fact_check_urls","created_at" FROM "news_data" WHERE "id"=?', [1]) completed
+DEBUG:tortoise.db_client:SELECT "id","title","videos","created_at","raw_text" FROM "raw_news_data" WHERE "id"=?: [1]
+DEBUG:aiosqlite:executing functools.partial(<bound method Connection._execute_fetchall of <aiosqlite.core.Connection object at 0x7f3565902e40>>, 'SELECT "id","title","videos","created_at","raw_text" FROM "raw_news_data" WHERE "id"=?', [1])
+DEBUG:aiosqlite:operation functools.partial(<bound method Connection._execute_fetchall of <aiosqlite.core.Connection object at 0x7f3565902e40>>, 'SELECT "id","title","videos","created_at","raw_text" FROM "raw_news_data" WHERE "id"=?', [1]) completed
+DEBUG:tortoise.db_client:SELECT "negative_opinion","positive_opinion","fact_check_summary","id","summary","fact_check_urls","created_at" FROM "news_data" WHERE "id"=? LIMIT ?: [1, 1]
+DEBUG:aiosqlite:executing functools.partial(<bound method Connection._execute_fetchall of <aiosqlite.core.Connection object at 0x7f3565902e40>>, 'SELECT "negative_opinion","positive_opinion","fact_check_summary","id","summary","fact_check_urls","created_at" FROM "news_data" WHERE "id"=? LIMIT ?', [1, 1])
+DEBUG:aiosqlite:operation functools.partial(<bound method Connection._execute_fetchall of <aiosqlite.core.Connection object at 0x7f3565902e40>>, 'SELECT "negative_opinion","positive_opinion","fact_check_summary","id","summary","fact_check_urls","created_at" FROM "news_data" WHERE "id"=? LIMIT ?', [1, 1]) completed
+DEBUG:tortoise.db_client:SELECT "raw_data_id","media_id","article_url","id","news_data_id","created_at" FROM "article" WHERE "news_data_id" IN (?): [1]
+DEBUG:aiosqlite:executing functools.partial(<bound method Connection._execute_fetchall of <aiosqlite.core.Connection object at 0x7f3565902e40>>, 'SELECT "raw_data_id","media_id","article_url","id","news_data_id","created_at" FROM "article" WHERE "news_data_id" IN (?)', [1])
+DEBUG:aiosqlite:operation functools.partial(<bound method Connection._execute_fetchall of <aiosqlite.core.Connection object at 0x7f3565902e40>>, 'SELECT "raw_data_id","media_id","article_url","id","news_data_id","created_at" FROM "article" WHERE "news_data_id" IN (?)', [1]) completed
+Registered apps: {'models': {'Article': <class 'backend.database.models.article.Article'>, 'Media': <class 'backend.database.models.media.Media'>, 'NewsData': <class 'backend.database.models.news_data.NewsData'>, 'RawNewsData': <class 'backend.database.models.raw_news_data.RawNewsData'>}}
+Registered models in 'models' app: dict_keys(['Article', 'Media', 'NewsData', 'RawNewsData'])
+Tables in DB: (5, [<sqlite3.Row object at 0x7f35657bf5e0>, <sqlite3.Row object at 0x7f35657bf610>, <sqlite3.Row object at 0x7f35657bf640>, <sqlite3.Row object at 0x7f35657bf670>, <sqlite3.Row object at 0x7f35657bf6d0>])
+Schema: CREATE TABLE "media" (
+    "id" INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+    "name" VARCHAR(255),
+    "site_url" VARCHAR(512) NOT NULL,
+    "trustworthiness" REAL NOT NULL DEFAULT 0,
+    "created_at" TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+)
+Schema: CREATE TABLE sqlite_sequence(name,seq)
+Schema: CREATE TABLE "news_data" (
+    "id" INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+    "summary" TEXT NOT NULL,
+    "fact_check_summary" TEXT NOT NULL,
+    "fact_check_urls" JSON NOT NULL,
+    "positive_opinion" TEXT NOT NULL,
+    "negative_opinion" TEXT NOT NULL,
+    "created_at" TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+)
+Schema: CREATE TABLE "raw_news_data" (
+    "id" INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+    "raw_text" TEXT NOT NULL,
+    "title" VARCHAR(512) NOT NULL,
+    "videos" JSON NOT NULL,
+    "created_at" TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+)
+Schema: CREATE TABLE "article" (
+    "id" INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+    "article_url" VARCHAR(1024) NOT NULL,
+    "created_at" TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "media_id" INT NOT NULL REFERENCES "media" ("id") ON DELETE CASCADE,
+    "news_data_id" INT REFERENCES "news_data" ("id") ON DELETE CASCADE,
+    "raw_data_id" INT UNIQUE REFERENCES "raw_news_data" ("id") ON DELETE CASCADE
+)
+Creating Media...
+Creating RawNewsData...
+Creating NewsData...
+Media ID: 1
+RawNewsData ID: 1
+NewsData ID: 1
+Creating Article with only Media...
+Success: Article with only Media created.
+Creating Article with Media and NewsData...
+Success: Article with Media and NewsData created.
+Creating full Article...
+Verifying relationships...
+Traceback (most recent call last):
+  File "/home/vvalntnv/development/news-agent/verify_new_models.py", line 104, in <module>
+    asyncio.run(verify())
+    ~~~~~~~~~~~^^^^^^^^^^
+  File "/home/vvalntnv/.local/share/uv/python/cpython-3.13.11-linux-x86_64-gnu/lib/python3.13/asyncio/runners.py", line 195, in run
+    return runner.run(main)
+           ~~~~~~~~~~^^^^^^
+  File "/home/vvalntnv/.local/share/uv/python/cpython-3.13.11-linux-x86_64-gnu/lib/python3.13/asyncio/runners.py", line 118, in run
+    return self._loop.run_until_complete(task)
+           ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^
+  File "/home/vvalntnv/.local/share/uv/python/cpython-3.13.11-linux-x86_64-gnu/lib/python3.13/asyncio/base_events.py", line 725, in run_until_complete
+    return future.result()
+           ~~~~~~~~~~~~~^^
+  File "/home/vvalntnv/development/news-agent/verify_new_models.py", line 97, in verify
+    assert len(fetched_news.articles) == 1
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError
