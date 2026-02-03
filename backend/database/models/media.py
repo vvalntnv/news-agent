@@ -11,11 +11,11 @@ class Media(models.Model):
 
     id = fields.IntField(pk=True)
     name = fields.CharField(max_length=255, null=True)
-    site_url = fields.CharField(max_length=512)
+    site_url = fields.CharField(max_length=512, unique=True, db_index=True)
     trustworthiness = fields.FloatField(default=0.0)
     created_at = fields.DatetimeField(auto_now_add=True)
 
-    class Meta:
+    class Meta:  # type: ignore
         table = "media"
 
     def __str__(self) -> str:

@@ -32,3 +32,8 @@ dev = [
 
 [tool.pytest.ini_options]
 anyio_mode = "auto"
+
+[tool.aerich]
+tortoise_orm = "database.manager.TORTOISE_ORM"
+location = "./migrations"
+src_folder = "./."
