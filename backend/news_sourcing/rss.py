@@ -5,10 +5,9 @@ import asyncio
 from news_sourcing.models import News
 from feedparser import FeedParserDict
 from .protocols import NewsSource
-from abc import ABC
 
 
-class RSSNewsSource(ABC, NewsSource):
+class RSSNewsSource(NewsSource):
     """
     Abstract Base Class for RSS-based news sources.
     """

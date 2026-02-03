@@ -2,11 +2,12 @@ from abc import ABC, abstractmethod
 from typing import List
 import httpx
 
+from database.models import RawNewsData
 from news_sourcing.models import News
-from .protocols import NewsSource
+from .protocols import NewsExtractor, NewsSource
 
 
-class ScraperNewsSource(ABC, NewsSource):
+class ScraperNewsSource(NewsSource, NewsExtractor):
     """
     Abstract Base Class for HTML Scraper-based news sources.
     """
@@ -28,6 +29,9 @@ class ScraperNewsSource(ABC, NewsSource):
         Must implement logic to go to the main page and find news links.
         """
         pass
+
+    async def extract_news_data(self) -> list[RawNewsData]:
+        return await super().extract_news_data()
 
     async def close(self):
         await self.client.aclose()
