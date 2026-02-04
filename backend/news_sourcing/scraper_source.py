@@ -82,6 +82,7 @@ class ScraperNewsSource(NewsSource, NewsExtractor):
             return full_url
 
         def get_title_from(tag: Tag):
+            breakpoint()
             title_selectors = ", ".join(scraper_info.titles_containers)
             title = tag.select_one(title_selectors)
 
