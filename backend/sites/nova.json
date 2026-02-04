@@ -1,0 +1,24 @@
+{
+  "scrapingUrl": "https://nova.bg/news",
+  "articleContainers": [
+    ".main-accent-wrapper",
+    ".thumb-box-wrapper",
+    ".sidebar-popular-box li",
+	"div.common-news-block"
+  ],
+  "titlesContainers": [
+    "a.title",
+    ".thumb-title h3 a",
+    ".thumb-title h4 a",
+    ".sidebar-popular-box li a span"
+  ],
+  "timestampsConteiners": [
+    ".media-date-on",
+    ".renewed"
+  ],
+  "summaryContainers": [
+    "p[itemprop='disambiguatingDescription']"
+  ],
+  "mainArticleContainer": ".news-list-wrapper",
+  "authorContainer": ""
+}

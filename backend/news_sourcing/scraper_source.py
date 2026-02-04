@@ -37,17 +37,25 @@ class ScraperNewsSource(NewsSource, NewsExtractor):
         """
         Must implement logic to go to the main page and find news links.
         """
-        out: list[News] = []
-        explored_urls: set[str] = set()
+        articles: dict[str, News] = {}
 
         for scraper_info in self.scraping_informations.values():
             news = await self._scrape_feed(scraper_info)
             for article in news:
-                if article.link not in explored_urls:
-                    explored_urls.add(article.link)
-                    out.append(article)
+                if article.link not in articles:
+                    articles.update({article.link: article})
+                else:
+                    loaded_article = articles[article.link]
+                    does_already_have_article_title = loaded_article.title is None
+                    does_current_article_have_title = article.title is not None
 
-        return out
+                    if (
+                        does_already_have_article_title
+                        and does_current_article_have_title
+                    ):
+                        articles.update({article.link: article})
+
+        return list(articles.values())
 
     async def extract_news_data(self) -> list[RawNewsData]: ...
 
@@ -84,8 +92,13 @@ class ScraperNewsSource(NewsSource, NewsExtractor):
 
         def get_title_from(tag: Tag):
             title_selectors = ", ".join(scraper_info.titles_containers)
-            title = tag.select_one(title_selectors)
+            tag_parent = tag.parent
 
+            if tag_parent is None:
+                text = tag.get_text()
+                return text or None
+
+            title = tag_parent.select_one(title_selectors)
             return title.get_text(strip=True) if title else None
 
         return (get_relative_link_from(tag), get_title_from(tag))

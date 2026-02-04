@@ -8,9 +8,9 @@ from news_sourcing.scraper_source import ScraperNewsSource
 @pytest.mark.asyncio
 async def test_bnt_scraper():
     # Load the BNT configuration
-    bnt_config_path = Path("backend/sites/bnt.json")
+    bnt_config_path = Path("backend/sites/nova.json")
     if not bnt_config_path.exists():
-        bnt_config_path = Path("sites/bnt.json")
+        bnt_config_path = Path("sites/nova.json")
 
     # Handle running from root or backend dir
     if not bnt_config_path.exists():
@@ -40,8 +40,8 @@ async def test_bnt_scraper():
     try:
         # Check for news
         news_items = await source.check_for_news()
-        breakpoint()
 
+        breakpoint()
         # Verify results
         assert news_items is not None
         assert len(news_items) > 0, "No news items found"
