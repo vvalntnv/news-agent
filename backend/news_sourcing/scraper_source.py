@@ -38,9 +38,14 @@ class ScraperNewsSource(NewsSource, NewsExtractor):
         Must implement logic to go to the main page and find news links.
         """
         out: list[News] = []
+        explored_urls: set[str] = set()
+
         for scraper_info in self.scraping_informations.values():
             news = await self._scrape_feed(scraper_info)
-            out.extend(news)
+            for article in news:
+                if article.link not in explored_urls:
+                    explored_urls.add(article.link)
+                    out.append(article)
 
         return out
 
@@ -55,16 +60,12 @@ class ScraperNewsSource(NewsSource, NewsExtractor):
 
         news_containers = self._get_news_containers_elements(soup, scraper_info)
 
-        explored_urls = set()
         out: list[News] = []
         for container in news_containers:
             news_tags = container.find_all(href=True)
 
             for tag in news_tags:
                 url, title = self._get_url_and_title_from_tag(tag, scraper_info)
-                if url in explored_urls:
-                    continue
-
                 out.append(News(link=url, title=title))
 
         return out
@@ -82,7 +83,6 @@ class ScraperNewsSource(NewsSource, NewsExtractor):
             return full_url
 
         def get_title_from(tag: Tag):
-            breakpoint()
             title_selectors = ", ".join(scraper_info.titles_containers)
             title = tag.select_one(title_selectors)
 
