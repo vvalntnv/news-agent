@@ -51,7 +51,7 @@ class HtmlExtractor(ContentExtractor):
         return Article(
             title=item.title,
             content=article_text,
-            videos=videos,  # type: ignore (Pydantic model has default_factory set)
+            videos=videos or [],
             author=author_container.get_text(),
             timestamp=(
                 timestamp.get_text()
