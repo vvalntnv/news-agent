@@ -12,6 +12,7 @@ class RawNewsData(models.Model):
     id = fields.IntField(pk=True)
     raw_text = fields.TextField()
     title = fields.CharField(max_length=512)
+    url = fields.CharField(max_length=2048, null=True, unique=True)
     # Storing list of video URLs as JSON
     videos = fields.JSONField(default=list)
     created_at = fields.DatetimeField(auto_now_add=True)

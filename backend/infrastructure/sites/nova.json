@@ -4,7 +4,7 @@
     ".main-accent-wrapper",
     ".thumb-box-wrapper",
     ".sidebar-popular-box li",
-	"div.common-news-block"
+    "div.common-news-block"
   ],
   "titlesContainers": [
     "a.title",

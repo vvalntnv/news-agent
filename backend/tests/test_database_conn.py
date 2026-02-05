@@ -1,5 +1,5 @@
 import pytest
-from database.manager import init_db
+from infrastructure.database.manager import init_db
 
 pytestmark = pytest.mark.anyio
 

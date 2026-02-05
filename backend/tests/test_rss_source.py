@@ -1,8 +1,8 @@
 import pytest
 from unittest.mock import MagicMock
-from news_sourcing.models import RSSInformation
-from news_sourcing.models.loader import NewsLoader
-from news_sourcing.rss import RSSNewsSource
+from domain.news.value_objects import RSSInformation
+from infrastructure.sites.loader import NewsLoader
+from infrastructure.sources.rss_source import RSSNewsSource
 from feedparser import FeedParserDict
 
 pytestmark = pytest.mark.anyio
@@ -17,13 +17,12 @@ async def test_rss_source_check_for_news(monkeypatch):
         FeedParserDict(link="http://example.com/3"),  # Missing title
     ]
 
-    # We need to mock the executor call since check_for_news runs in an executor
-    # But simpler is to mock feedparser.parse.
-    # However, it runs in loop.run_in_executor(None, feedparser.parse, url)
-    # So simply mocking feedparser.parse should work if it's imported in the module.
-
+    # Mock the executor call in local file.
+    # Note: verify where RSSNewsSource imports feedparser.
     mock_parse = MagicMock(return_value=mock_feed)
-    monkeypatch.setattr("news_sourcing.rss.feedparser.parse", mock_parse)
+    monkeypatch.setattr(
+        "infrastructure.sources.rss_source.feedparser.parse", mock_parse
+    )
 
     # Create RSSInformation
     rss_info = RSSInformation(rssFeed="http://example.com/feed")
@@ -38,11 +37,11 @@ async def test_rss_source_check_for_news(monkeypatch):
 
     assert len(news_items) == 3
     assert news_items[0].title == "Test Title 1"
-    assert news_items[0].link == "http://example.com/1"
+    assert news_items[0].url == "http://example.com/1"
     assert news_items[1].title == "Test Title 2"
-    assert news_items[1].link == "http://example.com/2"
+    assert news_items[1].url == "http://example.com/2"
     assert news_items[2].title is None
-    assert news_items[2].link == "http://example.com/3"
+    assert news_items[2].url == "http://example.com/3"
 
 
 async def test_rss_source_deduplication(monkeypatch):
@@ -56,7 +55,9 @@ async def test_rss_source_deduplication(monkeypatch):
     ]
 
     mock_parse = MagicMock(return_value=mock_feed)
-    monkeypatch.setattr("news_sourcing.rss.feedparser.parse", mock_parse)
+    monkeypatch.setattr(
+        "infrastructure.sources.rss_source.feedparser.parse", mock_parse
+    )
 
     rss_info = RSSInformation(rssFeed="http://example.com/feed")
     source = RSSNewsSource(
@@ -67,7 +68,7 @@ async def test_rss_source_deduplication(monkeypatch):
 
     assert len(news_items) == 1
     assert news_items[0].title == "Test Title 1"
-    assert news_items[0].link == "http://example.com/1"
+    assert news_items[0].url == "http://example.com/1"
 
 
 async def test_bta_rss():
@@ -80,6 +81,5 @@ async def test_bta_rss():
     )
 
     news_data = await source.check_for_news()
-    breakpoint()
 
     assert len(news_data) > 0

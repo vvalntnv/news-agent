@@ -1,20 +1,21 @@
 from typing import List
 import httpx
-from urllib.parse import urljoin, urlparse
+from urllib.parse import urljoin
 from bs4 import BeautifulSoup, Tag
 
-from database.models import RawNewsData
-from news_sourcing.models import News, ScrapeInformation
-from .protocols import NewsExtractor, NewsSource
+from domain.news.entities import NewsItem
+from domain.news.protocols import NewsSource
+from domain.news.value_objects import ScrapeInformation
 
 
-class ScraperNewsSource(NewsSource, NewsExtractor):
+class WebScraperSource(NewsSource):
     """
-    Abstract Base Class for HTML Scraper-based news sources.
+    HTML Scraper-based news source implementation.
+    Finds links on a page based on CSS selectors.
     """
 
     def __init__(self, base_url: str, registered_scrapers: list[ScrapeInformation]):
-        self.scraping_informations: dict[str, ScrapeInformation] = {}
+        self.scraping_informations: list[ScrapeInformation] = registered_scrapers
         self.source_link = base_url
         self.client = httpx.AsyncClient(
             headers={
@@ -25,27 +26,19 @@ class ScraperNewsSource(NewsSource, NewsExtractor):
             timeout=30.0,
         )
 
-        for scraper in registered_scrapers:
-            url_data = urlparse(scraper.scraping_url)
-            hostname = url_data.hostname
-
-            assert hostname is not None, "no hostname provided for scraping"
-
-            self.scraping_informations.update({hostname: scraper})
-
-    async def check_for_news(self) -> List[News]:
+    async def check_for_news(self) -> List[NewsItem]:
         """
-        Must implement logic to go to the main page and find news links.
+        Go to the main page and find news links.
         """
-        articles: dict[str, News] = {}
+        articles: dict[str, NewsItem] = {}
 
-        for scraper_info in self.scraping_informations.values():
+        for scraper_info in self.scraping_informations:
             news = await self._scrape_feed(scraper_info)
             for article in news:
-                if article.link not in articles:
-                    articles.update({article.link: article})
+                if article.url not in articles:
+                    articles.update({article.url: article})
                 else:
-                    loaded_article = articles[article.link]
+                    loaded_article = articles[article.url]
                     does_already_have_article_title = loaded_article.title is None
                     does_current_article_have_title = article.title is not None
 
@@ -53,28 +46,26 @@ class ScraperNewsSource(NewsSource, NewsExtractor):
                         does_already_have_article_title
                         and does_current_article_have_title
                     ):
-                        articles.update({article.link: article})
+                        articles.update({article.url: article})
 
         return list(articles.values())
-
-    async def extract_news_data(self) -> list[RawNewsData]: ...
 
     async def close(self):
         await self.client.aclose()
 
-    async def _scrape_feed(self, scraper_info: ScrapeInformation) -> list[News]:
+    async def _scrape_feed(self, scraper_info: ScrapeInformation) -> list[NewsItem]:
         page = await self.client.get(scraper_info.scraping_url)
         soup = BeautifulSoup(page.content, "html.parser")
 
         news_containers = self._get_news_containers_elements(soup, scraper_info)
 
-        out: list[News] = []
+        out: list[NewsItem] = []
         for container in news_containers:
             news_tags = container.find_all(href=True)
 
             for tag in news_tags:
                 url, title = self._get_url_and_title_from_tag(tag, scraper_info)
-                out.append(News(link=url, title=title))
+                out.append(NewsItem(url=url, title=title))
 
         return out
 

@@ -1,15 +1,16 @@
 from typing import List
 import feedparser
 import asyncio
-
-from news_sourcing.models import News, RSSInformation
 from feedparser import FeedParserDict
-from .protocols import NewsSource
+
+from domain.news.entities import NewsItem
+from domain.news.protocols import NewsSource
+from domain.news.value_objects import RSSInformation
 
 
 class RSSNewsSource(NewsSource):
     """
-    Abstract Base Class for RSS-based news sources.
+    RSS-based news source implementation.
     """
 
     def __init__(self, base_url: str, registered_rss_feeds: list[RSSInformation]):
@@ -20,19 +21,19 @@ class RSSNewsSource(NewsSource):
             hostname = rss.get_host()
             self.rss_informations.update({hostname: rss})
 
-    async def check_for_news(self) -> List[News]:
+    async def check_for_news(self) -> List[NewsItem]:
         """
-        Fetches the RSS feeds and returns a list of entry links (or titles as IDs).
+        Fetches the RSS feeds and returns a list of news items.
         """
-        articles: dict[str, News] = {}
+        articles: dict[str, NewsItem] = {}
 
         for rss_info in self.rss_informations.values():
             news = await self._fetch_feed(rss_info)
             for article in news:
-                if article.link not in articles:
-                    articles.update({article.link: article})
+                if article.url not in articles:
+                    articles.update({article.url: article})
                 else:
-                    loaded_article = articles[article.link]
+                    loaded_article = articles[article.url]
                     does_already_have_article_title = loaded_article.title is None
                     does_current_article_have_title = article.title is not None
 
@@ -40,18 +41,18 @@ class RSSNewsSource(NewsSource):
                         does_already_have_article_title
                         and does_current_article_have_title
                     ):
-                        articles.update({article.link: article})
+                        articles.update({article.url: article})
 
         return list(articles.values())
 
-    async def _fetch_feed(self, rss_info: RSSInformation) -> list[News]:
+    async def _fetch_feed(self, rss_info: RSSInformation) -> list[NewsItem]:
         # feedparser is synchronous, so we run it in an executor
         loop = asyncio.get_event_loop()
         feed = await loop.run_in_executor(None, feedparser.parse, rss_info.rss_feed)
 
         return self._transform_feed_to_news(feed)
 
-    def _transform_feed_to_news(self, feed: FeedParserDict) -> list[News]:
+    def _transform_feed_to_news(self, feed: FeedParserDict) -> list[NewsItem]:
         def _process_single_entry(entry: dict | FeedParserDict):
             link = entry.get("link")
             title = entry.get("title")
@@ -59,7 +60,7 @@ class RSSNewsSource(NewsSource):
             if link is None:
                 return None
 
-            return News(title=title, link=link)
+            return NewsItem(title=title, url=link)
 
         news = []
         for entry in feed.entries:

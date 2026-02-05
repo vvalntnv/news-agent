@@ -2,11 +2,6 @@ from urllib.parse import urlparse
 from pydantic import BaseModel, Field, ValidationError
 
 
-class News(BaseModel):
-    title: str | None
-    link: str
-
-
 class Information(BaseModel):
     def get_host(self) -> str:
         url = None
