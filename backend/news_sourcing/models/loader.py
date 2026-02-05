@@ -28,14 +28,17 @@ class NewsLoader:
         output = {"scrapers": [], "rss_feeds": []}
 
         for file in scraper_files:
-            file_wrapped = Path(file)
+            file_path = self.base_folder / file
 
-            if file_wrapped.is_dir():
+            if file_path.is_dir():
                 raise ValidationError("The file: " + file + " is a directory")
 
-            with open(file_wrapped, "r") as file:
+            with open(file_path, "r") as file:
                 data = file.read()
                 info, is_rss_feed = self._make_model_using_data(data)
+
+            if info is None:
+                continue
 
             if is_rss_feed:
                 output["rss_feeds"].append(info)
@@ -47,14 +50,18 @@ class NewsLoader:
     def _make_model_using_data(
         self,
         data: str | bytes | bytearray,
-    ) -> tuple[FeedInfo, IsRSSFeed]:
+    ) -> tuple[FeedInfo | None, IsRSSFeed]:
         deserialized_data = json.loads(data)
+
+        if not deserialized_data:
+            return (None, False)
 
         assert isinstance(
             deserialized_data, dict
         ), "deserialized data is invalid format"
 
-        if "rss_feed" in deserialized_data:
+        if "rssFeed" in deserialized_data:
+            breakpoint()
             model = RSSInformation(**deserialized_data)
             return model, True
 
