@@ -60,6 +60,11 @@ class RSSNewsSource(NewsSource):
             if link is None:
                 return None
 
+            if title is None:
+                return None
+
+            assert isinstance(title, str) and isinstance(link, str)
+
             return NewsItem(title=title, url=link)
 
         news = []

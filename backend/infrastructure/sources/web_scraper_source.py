@@ -73,7 +73,7 @@ class WebScraperSource(NewsSource):
         self,
         tag: Tag,
         scraper_info: ScrapeInformation,
-    ) -> tuple[str, str | None]:
+    ) -> tuple[str, str]:
         def get_relative_link_from(tag: Tag):
             relative_link = tag["href"]
             assert isinstance(relative_link, str)
@@ -87,10 +87,16 @@ class WebScraperSource(NewsSource):
 
             if tag_parent is None:
                 text = tag.get_text()
-                return text or None
+                if text is None:
+                    raise Exception("Title cannot be None")  # TODO: Create custom error
+
+                return text
 
             title = tag_parent.select_one(title_selectors)
-            return title.get_text(strip=True) if title else None
+            if title is None:
+                raise Exception("Title cannot be None")  # TODO: Create custom error
+
+            return title.get_text(strip=True)
 
         return (get_relative_link_from(tag), get_title_from(tag))
 

@@ -7,7 +7,7 @@ class NewsItem(BaseModel):
     It may not have the full content yet.
     """
 
-    title: str | None = None
+    title: str
     url: str
 
 
@@ -19,4 +19,6 @@ class Article(BaseModel):
     title: str
     content: str  # maps to raw_text
     videos: list[str] = Field(default_factory=list)
+    timestamp: str
+    author: str
     source_url: str | None = None

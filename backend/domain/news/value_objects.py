@@ -25,6 +25,7 @@ class ScrapeInformation(Information):
     article_containers: list[str] = Field(alias="articleContainers")
     titles_containers: list[str] = Field(alias="titlesContainers")
     timestamps_conteiners: list[str] = Field(alias="timestampsConteiners")
+    video_containers: list[str] | None = Field(alias="videoContainers", default=None)
     summary_containers: list[str] = Field(alias="summaryContainers")
     main_article_container: str = Field(alias="mainArticleContainer")
     author_container: str = Field(alias="authorContainer")
