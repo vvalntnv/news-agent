@@ -10,7 +10,7 @@ class Article(models.Model):
     """
 
     id = fields.IntField(pk=True)
-    media = fields.ForeignKeyField("models.Media", related_name="articles")
+    media = fields.ForeignKeyField("models.NewsMedia", related_name="articles")
     article_url = fields.CharField(max_length=1024)
     news_data = fields.ForeignKeyField(
         "models.NewsData", related_name="articles", null=True

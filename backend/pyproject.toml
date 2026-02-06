@@ -34,6 +34,6 @@ dev = [
 anyio_mode = "auto"
 
 [tool.aerich]
-tortoise_orm = "database.manager.TORTOISE_ORM"
+tortoise_orm = "core.config.config.tortoise_orm"
 location = "./migrations"
 src_folder = "./."

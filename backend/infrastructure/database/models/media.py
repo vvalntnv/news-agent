@@ -4,7 +4,7 @@ from pydantic import BaseModel
 from typing import Optional
 
 
-class Media(models.Model):
+class NewsMedia(models.Model):
     """
     Model to store media source information.
     """
@@ -16,17 +16,17 @@ class Media(models.Model):
     created_at = fields.DatetimeField(auto_now_add=True)
 
     class Meta:  # type: ignore
-        table = "media"
+        table = "news_media"
 
     def __str__(self) -> str:
         return self.name or self.site_url
 
 
-class MediaCreate(BaseModel):
+class NewsMediaCreate(BaseModel):
     name: Optional[str] = None
     site_url: str
     trustworthiness: float = 0.0
 
 
 # Create Pydantic models from Tortoise models for serialization
-MediaSchema = pydantic_model_creator(Media, name="MediaSchema")
+NewsMediaSchema = pydantic_model_creator(NewsMedia, name="NewsMediaSchema")
