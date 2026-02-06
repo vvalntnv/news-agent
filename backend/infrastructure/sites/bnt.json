@@ -12,12 +12,11 @@
     ".scroll-box a"
   ],
   "timestampsConteiners": [
-    "time.news-time",
-    ".scroll-box time"
+    "time.news-time"
   ],
   "summaryContainers": [
     ".sub-title"
   ],
-  "mainArticleContainer": ".top-news-wrap",
-  "authorContainer": ""
+  "mainArticleContainer": ".news-article-item",
+  "authorContainer": ".author > .name"
 }

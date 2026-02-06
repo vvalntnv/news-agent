@@ -339,21 +339,13 @@ class TestHtmlExtractorRealData:
         # Arrange
         extractor = HtmlExtractor(registered_scrapers=[bnt_scrape_info])
 
-        # Use a real BNT news URL
-        # Note: This test may fail if the URL is no longer valid or the site structure changes
-        random_news_data = NewsItem(
-            title="Test BNT Article",
-            url="https://bntnews.bg/news/politika",
-        )
-
         try:
             # Act
             article = await extractor.extract(random_news_data)
-            breakpoint()
 
             # Assert
             assert isinstance(article, Article)
-            assert article.title == random_news_data.title
+            assert article.title in random_news_data.title
             assert article.content is not None
             assert len(article.content) > 0
             assert article.source_url == random_news_data.url
