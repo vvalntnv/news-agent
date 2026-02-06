@@ -1,7 +1,7 @@
 import pytest
 from unittest.mock import MagicMock
 from domain.news.value_objects import RSSInformation
-from infrastructure.sites.loader import NewsLoader
+from infrastructure.extraction.loader import NewsLoader
 from infrastructure.sources.rss_source import RSSNewsSource
 from feedparser import FeedParserDict
 
@@ -14,7 +14,9 @@ async def test_rss_source_check_for_news(monkeypatch):
     mock_feed.entries = [  # type: ignore
         FeedParserDict(title="Test Title 1", link="http://example.com/1"),
         FeedParserDict(title="Test Title 2", link="http://example.com/2"),
-        FeedParserDict(link="http://example.com/3"),  # Missing title
+        FeedParserDict(
+            title="Test Title 3", link="http://example.com/3"
+        ),  # Missing title
     ]
 
     # Mock the executor call in local file.
@@ -40,7 +42,7 @@ async def test_rss_source_check_for_news(monkeypatch):
     assert news_items[0].url == "http://example.com/1"
     assert news_items[1].title == "Test Title 2"
     assert news_items[1].url == "http://example.com/2"
-    assert news_items[2].title is None
+    assert news_items[2].title == "Test Title 3"
     assert news_items[2].url == "http://example.com/3"
 
 

@@ -14,6 +14,7 @@ class RSSNewsSource(NewsSource):
     """
 
     def __init__(self, base_url: str, registered_rss_feeds: list[RSSInformation]):
+        self.scraping_informations = []
         self.rss_informations: dict[str, RSSInformation] = {}
         self.source_link = base_url
 

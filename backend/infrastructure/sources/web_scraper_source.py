@@ -3,6 +3,7 @@ import httpx
 from urllib.parse import urljoin
 from bs4 import BeautifulSoup, Tag
 
+from core.errors import MissingTitleError
 from domain.news.entities import NewsItem
 from domain.news.protocols import NewsSource
 from domain.news.value_objects import ScrapeInformation
@@ -64,7 +65,10 @@ class WebScraperSource(NewsSource):
             news_tags = container.find_all(href=True)
 
             for tag in news_tags:
-                url, title = self._get_url_and_title_from_tag(tag, scraper_info)
+                try:
+                    url, title = self._get_url_and_title_from_tag(tag, scraper_info)
+                except MissingTitleError:
+                    continue
                 out.append(NewsItem(url=url, title=title))
 
         return out
@@ -88,15 +92,39 @@ class WebScraperSource(NewsSource):
             if tag_parent is None:
                 text = tag.get_text()
                 if text is None:
-                    raise Exception("Title cannot be None")  # TODO: Create custom error
+                    raise MissingTitleError(
+                        scraping_url=scraper_info.scraping_url,
+                        href=get_relative_link_from(tag),
+                        selectors=scraper_info.titles_containers,
+                    )
 
-                return text
+                title_text = text.strip()
+                if not title_text:
+                    raise MissingTitleError(
+                        scraping_url=scraper_info.scraping_url,
+                        href=get_relative_link_from(tag),
+                        selectors=scraper_info.titles_containers,
+                    )
+
+                return title_text
 
             title = tag_parent.select_one(title_selectors)
             if title is None:
-                raise Exception("Title cannot be None")  # TODO: Create custom error
+                raise MissingTitleError(
+                    scraping_url=scraper_info.scraping_url,
+                    href=get_relative_link_from(tag),
+                    selectors=scraper_info.titles_containers,
+                )
 
-            return title.get_text(strip=True)
+            title_text = title.get_text(strip=True)
+            if not title_text:
+                raise MissingTitleError(
+                    scraping_url=scraper_info.scraping_url,
+                    href=get_relative_link_from(tag),
+                    selectors=scraper_info.titles_containers,
+                )
+
+            return title_text
 
         return (get_relative_link_from(tag), get_title_from(tag))
 
