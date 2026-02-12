@@ -1,5 +1,7 @@
 from pydantic import BaseModel, Field
 
+from domain.news.value_objects import ArticleContent
+
 
 class NewsItem(BaseModel):
     """
@@ -17,7 +19,7 @@ class Article(BaseModel):
     """
 
     title: str
-    content: str  # maps to raw_text
+    content: ArticleContent  # maps to raw_text + quotes
     videos: list[str] = Field(default_factory=list)
     timestamp: str
     author: str

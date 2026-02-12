@@ -17,3 +17,4 @@
 ## 4. Code Quality
 - Follow PEP 8 style guidelines.
 - Keep functions small and focused on a single task.
+- When doing complex checks with if, or while or whatever, always use variables to make the check more meaningful. Rather than complex checks like age < 18 and age >= 60, use is_underaged = age < 18 and is_senior = age >=60, for example, and then if is_underaged and not is_seniod: ... That way the checks get super readable.

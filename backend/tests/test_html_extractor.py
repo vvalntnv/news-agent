@@ -1,11 +1,11 @@
 import json
 import pytest
 from pathlib import Path
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import AsyncMock, MagicMock
 from datetime import datetime
 
 from domain.news.entities import NewsItem, Article
-from domain.news.value_objects import ScrapeInformation
+from domain.news.value_objects import ArticleContent, ScrapeInformation
 from infrastructure.extraction.html_extractor import HtmlExtractor
 from infrastructure.sources.web_scraper_source import WebScraperSource
 
@@ -42,12 +42,18 @@ def sample_html_content():
     <html>
     <head><title>Test Article</title></head>
     <body>
-        <article class="article-content">
+        <article class="article-content" id="article-main">
             <h1 class="title">Test Article Title</h1>
-            <div class="article-body">
+            <div class="article-body" style="color:red">
                 <p>This is the first paragraph of the article.</p>
+                <blockquote class="quote-box">Direct quote from article.</blockquote>
                 <p>This is the second paragraph with more content.</p>
+                <q data-owner="editor">Short quote in q tag.</q>
                 <p>Here is the conclusion of the article.</p>
+                <a class="related-link" href="https://example.com/reference" data-testid="ref-link">Reference</a>
+                <video controls src="https://example.com/inline-video.mp4"></video>
+                <div class="video-link">Embedded video link</div>
+                <script>console.log("ignore this")</script>
             </div>
         </article>
         <div class="metadata">
@@ -120,7 +126,19 @@ class TestHtmlExtractorMocked:
         # Assert
         assert isinstance(article, Article)
         assert article.title == "Test Article Title"
-        assert "This is the first paragraph" in article.content
+        assert isinstance(article.content, ArticleContent)
+        assert "This is the first paragraph" in article.content.raw_content
+        assert article.content.quotes == [
+            "Direct quote from article.",
+            "Short quote in q tag.",
+        ]
+        assert "script" not in article.content.raw_content
+        assert "video" not in article.content.raw_content
+        assert 'href="https://example.com/reference"' in article.content.raw_content
+        assert 'class="' not in article.content.raw_content
+        assert 'style="' not in article.content.raw_content
+        assert 'id="' not in article.content.raw_content
+        assert 'data-testid="' not in article.content.raw_content
         assert article.author == "John Doe"
         assert article.timestamp == "05/02/2026, 14:30:00"
         assert len(article.videos) == 2
@@ -145,10 +163,47 @@ class TestHtmlExtractorMocked:
         # Assert
         assert isinstance(article, Article)
         assert article.title == "Test Article Title"
-        assert "Article content without videos" in article.content
+        assert isinstance(article.content, ArticleContent)
+        assert "Article content without videos" in article.content.raw_content
+        assert article.content.quotes == []
         assert article.author == "Jane Smith"
         assert article.timestamp == "05/02/2026, 10:00:00"
         assert article.videos == []
+
+    async def test_extract_respects_custom_attributes_to_retain(
+        self, mock_scrape_info, mock_news_item
+    ):
+        """Test attribute retention can be configured at extractor construction."""
+        extractor = HtmlExtractor(
+            registered_scrapers=[mock_scrape_info],
+            attrs_to_retain=("href", "target"),
+        )
+
+        html_with_target_attribute = """
+        <!DOCTYPE html>
+        <html>
+        <body>
+            <article class="article-content" data-article-id="main">
+                <p class="paragraph">Article content.</p>
+                <a class="outbound" href="https://example.com/details" target="_blank" rel="nofollow">Read more</a>
+            </article>
+            <span class="author-name">Author Name</span>
+            <time class="timestamp">05/02/2026, 11:00:00</time>
+        </body>
+        </html>
+        """
+
+        mock_response = MagicMock()
+        mock_response.content = html_with_target_attribute.encode("utf-8")
+        extractor.client.get = AsyncMock(return_value=mock_response)
+
+        article = await extractor.extract(mock_news_item)
+
+        assert 'href="https://example.com/details"' in article.content.raw_content
+        assert 'target="_blank"' in article.content.raw_content
+        assert 'rel="' not in article.content.raw_content
+        assert 'class="' not in article.content.raw_content
+        assert 'data-article-id="' not in article.content.raw_content
 
     async def test_extract_no_timestamp_uses_current_time(
         self, mock_scrape_info, mock_news_item, sample_html_no_timestamp
@@ -297,7 +352,7 @@ class TestHtmlExtractorMocked:
         # Assert - should use scraper2's selectors (post-body, writer)
         assert isinstance(article, Article)
         assert article.author == "Test Author"
-        assert "Post content" in article.content
+        assert "Post content" in article.content.raw_content
 
 
 class TestHtmlExtractorRealData:
@@ -347,7 +402,7 @@ class TestHtmlExtractorRealData:
             assert isinstance(article, Article)
             assert article.title in random_news_data.title
             assert article.content is not None
-            assert len(article.content) > 0
+            assert len(article.content.raw_content) > 0
             assert article.source_url == random_news_data.url
 
             # Videos may or may not be present depending on the article
@@ -358,7 +413,7 @@ class TestHtmlExtractorRealData:
             assert len(article.timestamp) > 0
 
             print("Successfully extracted article from BNT")
-            print(f"Content length: {len(article.content)} characters")
+            print(f"Content length: {len(article.content.raw_content)} characters")
             print(f"Videos found: {len(article.videos)}")
             print(f"Timestamp: {article.timestamp}")
 

@@ -1,11 +1,12 @@
 from datetime import datetime
 from urllib.parse import urlparse
 
-from bs4 import BeautifulSoup
+from bs4 import BeautifulSoup, Tag
 import httpx
+from core.errors import MissingArticleContentError
 from domain.news.entities import NewsItem, Article
 from domain.news.protocols import ContentExtractor, Host
-from domain.news.value_objects import ScrapeInformation
+from domain.news.value_objects import ScrapeInformation, ArticleContent
 
 
 class HtmlExtractor(ContentExtractor):
@@ -13,9 +14,16 @@ class HtmlExtractor(ContentExtractor):
     Extracts content from HTML pages.
     """
 
-    def __init__(self, registered_scrapers: list[ScrapeInformation]) -> None:
+    def __init__(
+        self,
+        registered_scrapers: list[ScrapeInformation],
+        attrs_to_retain: tuple[str, ...] | list[str] = ("href",),
+    ) -> None:
         self.scraping_informations: dict[Host, ScrapeInformation] = {
             info.get_host(): info for info in registered_scrapers
+        }
+        self.attrs_to_retain: set[str] = {
+            attribute.lower() for attribute in attrs_to_retain
         }
         self.client = httpx.AsyncClient(
             headers={
@@ -33,7 +41,7 @@ class HtmlExtractor(ContentExtractor):
         page_data = page_response.content
 
         soup = BeautifulSoup(page_data, "html.parser")
-        article_text = self._extract_article(relevant_scraping_info, soup)
+        article_content = self._extract_article(relevant_scraping_info, soup)
 
         # TODO: Decide if we REALLY want to traverse time containers (for now no)
         timestamp = soup.select_one(relevant_scraping_info.timestamps_conteiners[0])
@@ -50,7 +58,7 @@ class HtmlExtractor(ContentExtractor):
 
         return Article(
             title=item.title,
-            content=article_text,
+            content=article_content,
             videos=videos or [],
             author=author_container.get_text(),
             timestamp=(
@@ -65,19 +73,94 @@ class HtmlExtractor(ContentExtractor):
         self,
         relevant_scraping_info: ScrapeInformation,
         soup: BeautifulSoup,
-    ) -> str:
+    ) -> ArticleContent:
         article_container = soup.select_one(
             relevant_scraping_info.main_article_container
         )
 
         if article_container is None:
-            raise Exception(
-                "There is no available article content for this news"
-            )  # TODO: Create custom error
+            raise MissingArticleContentError(
+                scraping_url=relevant_scraping_info.scraping_url,
+                selector=relevant_scraping_info.main_article_container,
+            )
 
-        return article_container.get_text()
+        article_container_copy = BeautifulSoup(str(article_container), "html.parser")
+        container_root = article_container_copy.find()
 
-    def _extract_videos_from_page(self, soup, video_selectors: list[str]):
+        if container_root is None:
+            raise MissingArticleContentError(
+                scraping_url=relevant_scraping_info.scraping_url,
+                selector=relevant_scraping_info.main_article_container,
+            )
+
+        self._strip_irrelevant_tags(
+            container_root,
+            relevant_scraping_info.video_containers,
+        )
+        quotes = self._extract_quotes(container_root)
+        self._retain_allowed_attributes(container_root)
+
+        return ArticleContent(
+            raw_content=str(container_root),
+            quotes=quotes,
+        )
+
+    def _strip_irrelevant_tags(
+        self,
+        article_container: Tag,
+        video_selectors: list[str] | None,
+    ) -> None:
+        irrelevant_tags = (
+            "audio",
+            "canvas",
+            "embed",
+            "iframe",
+            "noscript",
+            "object",
+            "script",
+            "source",
+            "style",
+            "svg",
+            "template",
+            "track",
+            "video",
+        )
+
+        for tag_name in irrelevant_tags:
+            for tag in article_container.find_all(tag_name):
+                tag.decompose()
+
+        if video_selectors:
+            for selector in video_selectors:
+                for tag in article_container.select(selector):
+                    tag.decompose()
+
+    def _extract_quotes(self, article_container: Tag) -> list[str]:
+        found_quotes: set[str] = set()
+
+        for quote_tag_name in ("blockquote", "q"):
+            for quote_tag in article_container.find_all(quote_tag_name):
+                quote_text = quote_tag.get_text(" ", strip=True)
+
+                if quote_text:
+                    found_quotes.add(quote_text)
+
+        return sorted(found_quotes)
+
+    def _retain_allowed_attributes(self, article_container: Tag) -> None:
+        tags_to_process = [article_container, *article_container.find_all(True)]
+        for tag in tags_to_process:
+            retained_attributes: dict[str, object] = {}
+            for attribute_name, attribute_value in tag.attrs.items():
+                if attribute_name.lower() in self.attrs_to_retain:
+                    retained_attributes[attribute_name] = attribute_value
+            tag.attrs = retained_attributes
+
+    def _extract_videos_from_page(
+        self,
+        soup: BeautifulSoup,
+        video_selectors: list[str],
+    ) -> list[str]:
         videos: list[str] = []
         for video_selector in video_selectors:
             videos_containers = soup.select(video_selector)
