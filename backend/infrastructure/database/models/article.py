@@ -20,7 +20,7 @@ class Article(models.Model):
     )
     created_at = fields.DatetimeField(auto_now_add=True)
 
-    class Meta:
+    class Meta:  # type: ignore
         table = "article"
 
     def __str__(self) -> str:
