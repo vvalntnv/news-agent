@@ -1,7 +1,6 @@
 from tortoise import fields, models
 from tortoise.contrib.pydantic import pydantic_model_creator
-from typing import List
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 
 class RawNewsData(models.Model):
@@ -15,6 +14,8 @@ class RawNewsData(models.Model):
     url = fields.CharField(max_length=2048, null=True, unique=True)
     # Storing list of video URLs as JSON
     videos = fields.JSONField(default=list)
+    # Storing list of extracted quotes as JSON
+    quotes = fields.JSONField(default=list)
     created_at = fields.DatetimeField(auto_now_add=True)
 
     class Meta:
@@ -27,7 +28,8 @@ class RawNewsData(models.Model):
 class RawNewsDataCreate(BaseModel):
     raw_text: str
     title: str
-    videos: List[str] = []
+    videos: list[str] = Field(default_factory=list)
+    quotes: list[str] = Field(default_factory=list)
 
 
 # Create Pydantic models from Tortoise models for serialization

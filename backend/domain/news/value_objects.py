@@ -1,4 +1,5 @@
 from urllib.parse import urlparse
+
 from pydantic import BaseModel, Field, ValidationError
 
 
@@ -33,3 +34,8 @@ class ScrapeInformation(Information):
 
 class RSSInformation(Information):
     rss_feed: str = Field(alias="rssFeed")
+
+
+class ArticleContent(BaseModel):
+    raw_content: str
+    quotes: list[str] = Field(default_factory=list)
