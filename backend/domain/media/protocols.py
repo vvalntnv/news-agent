@@ -1,30 +1,27 @@
+from pathlib import Path
 from typing import Protocol, runtime_checkable
 
-from pathlib import Path
-
-from domain.media.supported_media_types import SupportedStreamTypes
-from .value_objects import VideoData, AudioData, MediaDownloadableLink
-
-type DownloadedVideoFolderPath = Path
-type DownloadedImageFolderPath = Path
-type DownloadedAudioFolderPath = Path
+from domain.media.value_objects import (
+    DownloadedMedia,
+    MediaDownloadableLink,
+    MuxedMedia,
+    ResolvedMediaStream,
+)
 
 
 @runtime_checkable
 class StreamResolverProtocol(Protocol):
+    """
+    Protocol for resolving stream URLs to concrete downloadable links.
+    """
 
-    stream_type: SupportedStreamTypes
+    async def can_resolve(self, stream_url: str) -> bool: ...
 
-    # Might want to transform that into a dict?
-    # The video can either be a web url
-    async def resolve_stream(
-        self,
-        video_to_resolve: str,
-    ) -> list[MediaDownloadableLink]:
+    async def resolve_stream(self, video_to_resolve: str) -> ResolvedMediaStream:
         """
-        This method gets a url for a video streams and then resolves the
-        given manifest file (if any) to produce downloadable links, that
-        then can be downloaded by the VideoDownloaderProtocol
+        This method gets a url for a video stream and resolves the given
+        manifest/file (if any) to produce downloadable links that can then
+        be downloaded by the VideoDownloaderProtocol.
         """
         ...
 
@@ -32,82 +29,56 @@ class StreamResolverProtocol(Protocol):
 @runtime_checkable
 class VideoDownloaderProtocol(Protocol):
     """
-    Protocol for downloading videos from URLs.
-
-    Implementations should handle downloading video content from
-    provided URLs and saving them to a specified location.
+    Protocol for downloading videos from resolved URLs.
     """
 
     path_to_download: Path | str
-    """Path where downloaded videos should be saved."""
+    """Path where downloaded files should be saved."""
 
     video_urls: list[MediaDownloadableLink]
-    """List of video URLs with associated metadata to download."""
+    """Ordered list of URLs with metadata to download."""
 
-    async def download_video(self) -> DownloadedVideoFolderPath:
-        """
-        Downloads the video and returns the local path/URL of the downloaded file.
-
-        Returns:
-            DownloadedVideoUrl: Path or URL to the downloaded video file.
-
-        Raises:
-            DownloadError: If the video download fails.
-        """
-        ...
+    async def download_video(self) -> DownloadedMedia: ...
 
 
 @runtime_checkable
 class ImageDownloaderProtocol(Protocol):
     """
-    Protocol for downloading images from URLs.
-
-    Implementations should handle downloading image content from
-    provided URLs and saving them to a specified location.
+    Protocol for downloading images from resolved URLs.
     """
 
     path_to_download: Path | str
-    """Path where downloaded images should be saved."""
+    """Path where downloaded files should be saved."""
 
     image_urls: list[MediaDownloadableLink]
-    """List of image URLs to download."""
+    """List of image URLs with metadata to download."""
 
-    async def download_image(self) -> DownloadedImageFolderPath:
-        """
-        Downloads the image and returns the local path/URL of the downloaded file.
-
-        Returns:
-            DownloadedImageUrl: Path or URL to the downloaded image file.
-
-        Raises:
-            DownloadError: If the image download fails.
-        """
-        ...
+    async def download_image(self) -> DownloadedMedia: ...
 
 
 @runtime_checkable
 class AudioDownloaderProtocol(Protocol):
     """
-    Protocol for downloading audio from URLs.
-
-    Implementations should handle downloading audio content from
-    provided URLs and saving them to a specified location.
+    Protocol for downloading audio from resolved URLs.
     """
 
     path_to_download: Path | str
-    """Path where downloaded audio files should be saved."""
+    """Path where downloaded files should be saved."""
 
     audio_urls: list[MediaDownloadableLink]
-    """List of audio URLs with associated metadata to download."""
+    """List of audio URLs with metadata to download."""
 
-    async def download_audio(self) -> DownloadedAudioFolderPath:
-        """
-        Downloads the audio and returns the local path/URL of the downloaded file.
+    async def download_audio(self) -> DownloadedMedia: ...
 
-        Returns:
-            DownloadedAudioUrl: Path or URL to the downloaded audio file.
 
-        Raises:
-            DownloadError: If the audio download fails.
-        """
-        ...
+@runtime_checkable
+class MediaMuxerProtocol(Protocol):
+    """
+    Protocol for muxing downloaded chunks/files into final media output.
+    """
+
+    async def mux(
+        self,
+        downloaded_media: DownloadedMedia,
+        output_file_name: str | None = None,
+    ) -> MuxedMedia: ...

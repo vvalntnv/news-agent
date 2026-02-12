@@ -17,3 +17,9 @@
 ## 4. Code Quality
 - Follow PEP 8 style guidelines.
 - Keep functions small and focused on a single task.
+
+## 5. Configuration
+- Any behavior that users/operators might want to tune must be exposed via
+  `backend/core/config.py` (and environment variables through that config).
+- Avoid hardcoded operational values in services/resolvers/muxers/downloaders
+  when they can be configurable.
