@@ -1,9 +1,12 @@
 import pytest
 import httpx
 
+from pathlib import Path
+from tempfile import TemporaryDirectory
 from domain.media.supported_media_types import SupportedStreamTypes
 from domain.media.value_objects import MediaDownloadableLink
 from infrastructure.media.downloaders.video_downloader import VideoDownloader
+from infrastructure.media.resolvers.dash_mpd_resolver import DashMPDResolver
 
 pytestmark = pytest.mark.anyio
 
@@ -103,3 +106,21 @@ async def test_video_downloader_skips_sort_when_links_already_sorted(
 
     assert ordered is urls
     await client.aclose()
+
+
+@pytest.mark.skip()
+async def test_downloading_real_world_video() -> None:
+    video_url = "https://media09.vbox7.com/sl/mi1WT9ID2u4XwTQEu-ygRA/1771192800/7d/7d4b25d085/7d4b25d085.mpd"
+    with TemporaryDirectory() as tmp_dir:
+        resolved_stream = await DashMPDResolver().resolve_stream(video_url)
+        downloader = VideoDownloader(
+            path_to_download=tmp_dir,
+            chunks_data=resolved_stream.links,
+            stream_type=SupportedStreamTypes.DASH,
+            source_url=resolved_stream.source_url,
+        )
+
+        downloaded_media = await downloader.download_video()
+
+        assert len(downloaded_media.chunks) > 0
+        assert downloaded_media.chunks[0].file_path.exists()
