@@ -1,9 +1,13 @@
 from __future__ import annotations
 
+import asyncio
 from pathlib import Path
+from typing import Awaitable
 from urllib.parse import urlparse
 
+import aiofiles
 import httpx
+from concurrent.futures import ThreadPoolExecutor
 
 from core.config import config
 from domain.media.protocols import VideoDownloaderProtocol
@@ -43,14 +47,17 @@ class VideoDownloader(VideoDownloaderProtocol):
 
         downloaded_chunks: list[DownloadedMediaChunk] = []
         try:
+            jobs: list[Awaitable[DownloadedMediaChunk]] = []
             for index, chunk in enumerate(ordered_urls):
-                downloaded_chunks.append(
-                    await self._download_chunk(
+                jobs.append(
+                    self._download_chunk(
                         chunk=chunk,
                         chunk_index=index,
                         download_dir=download_dir,
                     )
                 )
+
+            downloaded_chunks = await asyncio.gather(*jobs)
         finally:
             if self._is_client_owned:
                 await self._client.aclose()
@@ -75,21 +82,34 @@ class VideoDownloader(VideoDownloaderProtocol):
         chunk_index: int,
         download_dir: Path,
     ) -> DownloadedMediaChunk:
-        response = await self._client.get(chunk.url)
-        response.raise_for_status()
+        async with self._client.stream("GET", chunk.url) as stream:
+            extension = self._extract_extension(chunk.url)
+            segment_label = "init" if chunk.is_initialization_segment else "chunk"
 
-        extension = self._extract_extension(chunk.url)
-        segment_label = "init" if chunk.is_initialization_segment else "chunk"
-        file_name = f"{chunk_index:05d}_{segment_label}{extension}"
-        file_path = download_dir / file_name
-        file_path.write_bytes(response.content)
+            file_name = f"{chunk_index:05d}_{segment_label}{extension}"
+            file_path = download_dir / file_name
 
-        return DownloadedMediaChunk(
-            source_url=chunk.url,
-            file_path=file_path,
-            sequence_number=chunk.sequence_number,
-            is_initialization_segment=chunk.is_initialization_segment,
-        )
+            stream.raise_for_status()
+
+            async with aiofiles.open(file_path, "wb") as file:
+                async for content in stream.aiter_bytes():
+                    await file.write(content)
+
+            return DownloadedMediaChunk(
+                source_url=chunk.url,
+                file_path=file_path,
+                sequence_number=chunk.sequence_number,
+                is_initialization_segment=chunk.is_initialization_segment,
+            )
+
+        # response = await self._client.get(chunk.url)
+        # response.raise_for_status()
+        #
+        # extension = self._extract_extension(chunk.url)
+        # segment_label = "init" if chunk.is_initialization_segment else "chunk"
+        # file_name = f"{chunk_index:05d}_{segment_label}{extension}"
+        # file_path = download_dir / file_name
+        # file_path.write_bytes(response.content)
 
     def _prepare_ordered_urls(self) -> list[MediaDownloadableLink]:
         if self._is_sorted(self.video_urls):
