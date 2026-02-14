@@ -30,6 +30,7 @@ class Config(BaseSettings):
     ffmpeg_audio_codec: str = "aac"
     ffmpeg_audio_bitrate: str = "128k"
     ffmpeg_movflags: str = "+faststart"
+    dash_concat_chunk_size_bytes: int = 5 * 2**20
     db_user: str = "postgres"
     db_pass: str = "postgres"
     db_host: str = "localhost"

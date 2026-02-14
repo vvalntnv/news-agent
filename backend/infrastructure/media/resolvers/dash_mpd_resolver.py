@@ -303,9 +303,14 @@ class DashMPDResolver(StreamResolverProtocol):
 
         initialization_template = segment_template.attrib.get("initialization")
         if initialization_template:
+            parsed_initialization_template = self._expand_template(
+                template=initialization_template,
+                selection=selection,
+                number=0,  # because it is initialization template we dont really expect it to have a number
+            )
             links.append(
                 MediaDownloadableLink(
-                    url=urljoin(selection.base_url, initialization_template),
+                    url=urljoin(selection.base_url, parsed_initialization_template),
                     sequence_number=0,
                     is_initialization_segment=True,
                 )

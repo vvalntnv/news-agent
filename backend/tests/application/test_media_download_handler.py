@@ -1,4 +1,6 @@
+import os
 from pathlib import Path
+from tempfile import TemporaryDirectory
 
 import pytest
 from fastapi import FastAPI
@@ -126,3 +128,27 @@ def test_mount_static_files_exposes_static_directory(tmp_path) -> None:
 
     assert response.status_code == 200
     assert response.text == "hello"
+
+
+@pytest.mark.skip()
+async def test_media_handler_with_real_data() -> None:
+    # video_url = "https://dash.akamaized.net/akamai/bbb_30fps/bbb_30fps.mpd"
+
+    # video_url = "https://bntnews.bg/f/video/o/1379/3662a51b77a8cb339c85425a5bfed570.mp4"
+    video_url = "https://cdn.btv.bg/hls/2113748829/master.m3u8"
+
+    with TemporaryDirectory() as tmp_dir:
+        dir = Path(tmp_dir)
+        downloads_dir = dir / "downloads"
+        downloads_dir.mkdir(parents=True)
+
+        videos_dir = dir / "videos"
+        videos_dir.mkdir(parents=True)
+
+        video = MediaDownloadHandler(
+            download_root=downloads_dir, static_media_root=videos_dir
+        )
+
+        download = await video.download_single(video_url)
+
+        breakpoint()

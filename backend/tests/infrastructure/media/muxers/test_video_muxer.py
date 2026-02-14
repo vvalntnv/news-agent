@@ -45,7 +45,7 @@ async def test_video_muxer_uses_half_cpu_cores_and_returns_static_path(
         return _ProcessStub()
 
     monkeypatch.setattr(
-        "infrastructure.media.muxers.video_muxer.asyncio.create_subprocess_exec",
+        "infrastructure.media.muxers.ffmpeg.ffmpeg_command.asyncio.create_subprocess_exec",
         fake_subprocess_exec,
     )
 
@@ -95,7 +95,7 @@ async def test_video_muxer_uses_concat_for_multiple_chunks(
         return _ProcessStub()
 
     monkeypatch.setattr(
-        "infrastructure.media.muxers.video_muxer.asyncio.create_subprocess_exec",
+        "infrastructure.media.muxers.ffmpeg.ffmpeg_command.asyncio.create_subprocess_exec",
         fake_subprocess_exec,
     )
 

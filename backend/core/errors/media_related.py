@@ -141,6 +141,17 @@ class MediaMuxNoChunksError(InternalError):
         )
 
 
+class MediaMuxDirectRequiresSingleChunkError(InternalError):
+    def __init__(self, chunk_count: int) -> None:
+        super().__init__(
+            internal_payload=ErrorPayload(
+                code="media_mux_direct_requires_single_chunk",
+                message="Direct stream muxing expects exactly one downloaded chunk.",
+                details={"chunk_count": str(chunk_count)},
+            )
+        )
+
+
 class FFmpegExecutionError(InternalError):
     def __init__(self, command: list[str], return_code: int, stderr: str) -> None:
         super().__init__(
@@ -151,6 +162,47 @@ class FFmpegExecutionError(InternalError):
                     "return_code": str(return_code),
                     "command": " ".join(command),
                     "stderr": stderr,
+                },
+            )
+        )
+
+
+class MediaMuxChunksInDifferentPathsError(InternalError):
+    def __init__(self, chunk1_path: str, chunk2_path: str) -> None:
+        super().__init__(
+            internal_payload=ErrorPayload(
+                code="media_mux_chunks_in_different_paths",
+                message="All chunks must be in the same directory for concatenation.",
+                details={
+                    "chunk1_path": chunk1_path,
+                    "chunk2_path": chunk2_path,
+                },
+            )
+        )
+
+
+class MediaMuxChunksDifferentExtensionsError(InternalError):
+    def __init__(self, chunk1_extension: str, chunk2_extension: str) -> None:
+        super().__init__(
+            internal_payload=ErrorPayload(
+                code="media_mux_chunks_different_extensions",
+                message="All chunks must have the same file extension for concatenation.",
+                details={
+                    "chunk1_extension": chunk1_extension,
+                    "chunk2_extension": chunk2_extension,
+                },
+            )
+        )
+
+
+class MediaMuxMissingInitializationSegmentError(InternalError):
+    def __init__(self, chunk_count: int) -> None:
+        super().__init__(
+            internal_payload=ErrorPayload(
+                code="media_mux_missing_initialization_segment",
+                message="Cannot mux media without an initialization segment.",
+                details={
+                    "chunk_count": str(chunk_count),
                 },
             )
         )

@@ -133,3 +133,15 @@ async def test_dash_resolver_raises_custom_error_when_adaptation_set_missing() -
         await resolver.resolve_stream("https://example.com/manifest.mpd")
 
     await client.aclose()
+
+
+# This lil dude seems to be working
+# Skipped becuase the url will not always be present
+@pytest.mark.skip()
+async def test_dash_resolver_with_real_world() -> None:
+    video_manifest = "https://media09.vbox7.com/sl/mi1WT9ID2u4XwTQEu-ygRA/1771192800/7d/7d4b25d085/7d4b25d085.mpd"
+    resolver = DashMPDResolver()
+
+    stream_data = await resolver.resolve_stream(video_manifest)
+    assert len(stream_data.links) > 0
+    assert stream_data.links[0].url, "No url provided"
