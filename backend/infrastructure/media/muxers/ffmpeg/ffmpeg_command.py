@@ -1,10 +1,12 @@
+from __future__ import annotations
+
 import asyncio
-from asyncio.subprocess import Process
 import os
 from abc import ABC, abstractmethod
+from asyncio.subprocess import Process
 from pathlib import Path
 
-from pydantic import BaseModel, DirectoryPath
+from pydantic import BaseModel
 
 from core.config import config
 from core.errors.media_related import FFmpegExecutionError
@@ -14,7 +16,7 @@ from domain.media.value_objects import DownloadedMediaChunk
 
 class FFMpegResult(BaseModel):
     stderr: str | None
-    output_dir: DirectoryPath
+    output_path: Path
 
 
 class BaseFFMpegCommand(ABC):
@@ -22,15 +24,16 @@ class BaseFFMpegCommand(ABC):
         self,
         chunks: list[DownloadedMediaChunk],
         output_path: Path,
+        ffmpeg_binary: str | None = None,
         threads_to_use: int | None = None,
     ) -> None:
-        self._ffmpeg_binary = config.ffmpeg_binary
+        self._ffmpeg_binary = ffmpeg_binary or config.ffmpeg_binary
         self._chunks = chunks
-
-        assert output_path.is_file()
         self._output_path = output_path
-
-        self._threads_to_use = threads_to_use or self._resolve_thread_count()
+        if threads_to_use is not None and threads_to_use > 0:
+            self._threads_to_use = threads_to_use
+        else:
+            self._threads_to_use = self._resolve_thread_count()
 
     stream_type: SupportedStreamTypes
 
@@ -60,11 +63,11 @@ class BaseFFMpegCommand(ABC):
         stderr = await self._handle_process(process, ffmpeg_args)
 
         return FFMpegResult(
-            stderr=str(stderr),
-            output_dir=self._output_path,  # type: ignore
+            stderr=stderr,
+            output_path=self._output_path,
         )
 
-    async def _handle_process(self, process: Process, ffmpeg_args: list[str]) -> bytes:
+    async def _handle_process(self, process: Process, ffmpeg_args: list[str]) -> str:
         # Stdout
         _, stderr = await process.communicate()
         if process.returncode != 0:
@@ -76,4 +79,28 @@ class BaseFFMpegCommand(ABC):
                 stderr=decoded_error,
             )
 
-        return stderr
+        return stderr.decode("utf-8", errors="ignore")
+
+    def _build_common_output_args(self) -> list[str]:
+        return [
+            "-threads",
+            str(self._threads_to_use),
+            *self._build_transcode_flags(),
+            str(self._output_path),
+        ]
+
+    def _build_transcode_flags(self) -> list[str]:
+        return [
+            "-c:v",
+            config.ffmpeg_video_codec,
+            "-preset",
+            config.ffmpeg_video_preset,
+            "-crf",
+            str(config.ffmpeg_video_crf),
+            "-c:a",
+            config.ffmpeg_audio_codec,
+            "-b:a",
+            config.ffmpeg_audio_bitrate,
+            "-movflags",
+            config.ffmpeg_movflags,
+        ]

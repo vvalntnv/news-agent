@@ -141,6 +141,17 @@ class MediaMuxNoChunksError(InternalError):
         )
 
 
+class MediaMuxDirectRequiresSingleChunkError(InternalError):
+    def __init__(self, chunk_count: int) -> None:
+        super().__init__(
+            internal_payload=ErrorPayload(
+                code="media_mux_direct_requires_single_chunk",
+                message="Direct stream muxing expects exactly one downloaded chunk.",
+                details={"chunk_count": str(chunk_count)},
+            )
+        )
+
+
 class FFmpegExecutionError(InternalError):
     def __init__(self, command: list[str], return_code: int, stderr: str) -> None:
         super().__init__(

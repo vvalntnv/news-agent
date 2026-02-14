@@ -69,10 +69,27 @@ mechanism.
 Located in `backend/infrastructure/media/muxers/video_muxer.py`:
 
 - `VideoMuxer`
-  - For one input file: compresses to `.mp4`.
-  - For multiple chunks: builds ffmpeg concat input, then compresses to `.mp4`.
+  - Keeps one orchestration entry point for all stream types.
+  - Selects a stream-type-specific ffmpeg command class and executes it.
   - Uses thread count `max(1, os.cpu_count() // 2)`.
   - Writes to `static/media/`.
+
+Command classes are located in
+`backend/infrastructure/media/muxers/ffmpeg/`:
+
+- `DirectFileCompression`
+  - Used for `SupportedStreamTypes.DIRECT`.
+  - Expects exactly one downloaded chunk and compresses it to `.mp4`.
+- `HLSFFMpegConcat`
+  - Used for `SupportedStreamTypes.HLS`.
+  - Builds a temporary ffmpeg concat input list and muxes/compresses to `.mp4`.
+- `DASHFFMpegConcat`
+  - Used for `SupportedStreamTypes.DASH`.
+  - Concatenates initialization/media bytes through stdin and muxes/compresses to
+    `.mp4`.
+
+Shared ffmpeg output/transcode arguments are centralized in
+`BaseFFMpegCommand` and read from `backend/core/config.py`.
 
 ## Orchestration
 

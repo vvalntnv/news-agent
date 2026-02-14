@@ -1,14 +1,20 @@
 from __future__ import annotations
 
-import asyncio
 import os
 from pathlib import Path
 from uuid import uuid4
 
 from core.config import config
-from core.errors import FFmpegExecutionError, MediaMuxNoChunksError
+from core.errors import MediaMuxNoChunksError
 from domain.media.protocols import MediaMuxerProtocol
+from domain.media.supported_media_types import SupportedStreamTypes
 from domain.media.value_objects import DownloadedMedia, DownloadedMediaChunk, MuxedMedia
+from infrastructure.media.muxers.ffmpeg.concatenate_dash_command import DASHFFMpegConcat
+from infrastructure.media.muxers.ffmpeg.concatenate_hls_command import HLSFFMpegConcat
+from infrastructure.media.muxers.ffmpeg.direct_file_compression_command import (
+    DirectFileCompression,
+)
+from infrastructure.media.muxers.ffmpeg.ffmpeg_command import BaseFFMpegCommand
 
 
 class VideoMuxer(MediaMuxerProtocol):
@@ -20,6 +26,14 @@ class VideoMuxer(MediaMuxerProtocol):
     ) -> None:
         self._static_media_root = Path(static_media_root or config.media_static_root)
         self._ffmpeg_binary = ffmpeg_binary or config.ffmpeg_binary
+        self._configured_threads = ffmpeg_threads
+        self._commands_by_stream_type: dict[
+            SupportedStreamTypes, type[BaseFFMpegCommand]
+        ] = {
+            SupportedStreamTypes.DASH: DASHFFMpegConcat,
+            SupportedStreamTypes.HLS: HLSFFMpegConcat,
+            SupportedStreamTypes.DIRECT: DirectFileCompression,
+        }
 
     async def mux(
         self,
@@ -34,16 +48,29 @@ class VideoMuxer(MediaMuxerProtocol):
         output_stem = output_file_name or uuid4().hex
         output_path = self._static_media_root / f"{output_stem}.mp4"
         sorted_chunks = self._prepare_chunks(downloaded_media.chunks)
+        command = self._build_command(
+            downloaded_media.stream_type, sorted_chunks, output_path
+        )
 
-        if len(sorted_chunks) == 1:
-            ffmpeg_args = self._build_command_for_single_file(
-                sorted_chunks[0].file_path,
-                output_path,
-                ffmpeg_threads,
-            )
-            return self._build_muxed_media(downloaded_media, output_path)
-
+        await command.execute_command()
         return self._build_muxed_media(downloaded_media, output_path)
+
+    def _build_command(
+        self,
+        stream_type: SupportedStreamTypes,
+        chunks: list[DownloadedMediaChunk],
+        output_path: Path,
+    ) -> BaseFFMpegCommand:
+        command_type = self._commands_by_stream_type.get(stream_type)
+        if command_type is None:
+            raise ValueError(f"Unsupported stream type: {stream_type}")
+
+        return command_type(
+            chunks=chunks,
+            output_path=output_path,
+            ffmpeg_binary=self._ffmpeg_binary,
+            threads_to_use=self._resolve_thread_count(),
+        )
 
     def _build_muxed_media(
         self,
@@ -57,82 +84,6 @@ class VideoMuxer(MediaMuxerProtocol):
             output_path=output_path,
             static_url_path=f"{static_prefix}/{output_path.name}",
         )
-
-    async def _mux_multiple_files(
-        self,
-        sorted_chunks: list[DownloadedMediaChunk],
-        output_path: Path,
-        ffmpeg_threads: int,
-    ) -> None:
-        concat_file = output_path.with_suffix(".concat.txt")
-        concat_lines = [
-            f"file '{chunk.file_path.as_posix()}'" for chunk in sorted_chunks
-        ]
-        concat_file.write_text("\n".join(concat_lines), encoding="utf-8")
-        try:
-            ffmpeg_args = self._build_command_for_multiple_files(
-                concat_file,
-                output_path,
-                ffmpeg_threads,
-            )
-            await self._run_ffmpeg(ffmpeg_args)
-        finally:
-            if concat_file.exists():
-                concat_file.unlink()
-
-    def _build_command_for_single_file(
-        self,
-        input_file: Path,
-        output_file: Path,
-        ffmpeg_threads: int,
-    ) -> list[str]:
-        return [
-            self._ffmpeg_binary,
-            "-y",
-            "-i",
-            str(input_file),
-            "-threads",
-            str(ffmpeg_threads),
-            *self._build_transcode_flags(),
-            str(output_file),
-        ]
-
-    def _build_command_for_multiple_files(
-        self,
-        concat_file: Path,
-        output_file: Path,
-        ffmpeg_threads: int,
-    ) -> list[str]:
-        return [
-            self._ffmpeg_binary,
-            "-y",
-            "-f",
-            "concat",
-            "-safe",
-            "0",
-            "-i",
-            str(concat_file),
-            "-threads",
-            str(ffmpeg_threads),
-            *self._build_transcode_flags(),
-            str(output_file),
-        ]
-
-    def _build_transcode_flags(self) -> list[str]:
-        return [
-            "-c:v",
-            config.ffmpeg_video_codec,
-            "-preset",
-            config.ffmpeg_video_preset,
-            "-crf",
-            str(config.ffmpeg_video_crf),
-            "-c:a",
-            config.ffmpeg_audio_codec,
-            "-b:a",
-            config.ffmpeg_audio_bitrate,
-            "-movflags",
-            config.ffmpeg_movflags,
-        ]
 
     def _prepare_chunks(
         self,
@@ -156,3 +107,12 @@ class VideoMuxer(MediaMuxerProtocol):
     def _chunk_sort_key(self, chunk: DownloadedMediaChunk) -> tuple[int, int]:
         initialization_order = 0 if chunk.is_initialization_segment else 1
         return (initialization_order, chunk.sequence_number)
+
+    def _resolve_thread_count(self) -> int:
+        if self._configured_threads is not None and self._configured_threads > 0:
+            return self._configured_threads
+
+        if config.ffmpeg_threads is not None and config.ffmpeg_threads > 0:
+            return config.ffmpeg_threads
+
+        return max(1, (os.cpu_count() or 1) // 2)
