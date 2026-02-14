@@ -20,7 +20,6 @@ class VideoMuxer(MediaMuxerProtocol):
     ) -> None:
         self._static_media_root = Path(static_media_root or config.media_static_root)
         self._ffmpeg_binary = ffmpeg_binary or config.ffmpeg_binary
-        self._configured_threads = ffmpeg_threads
 
     async def mux(
         self,
@@ -34,7 +33,6 @@ class VideoMuxer(MediaMuxerProtocol):
 
         output_stem = output_file_name or uuid4().hex
         output_path = self._static_media_root / f"{output_stem}.mp4"
-        ffmpeg_threads = self._resolve_thread_count()
         sorted_chunks = self._prepare_chunks(downloaded_media.chunks)
 
         if len(sorted_chunks) == 1:
@@ -43,10 +41,8 @@ class VideoMuxer(MediaMuxerProtocol):
                 output_path,
                 ffmpeg_threads,
             )
-            await self._run_ffmpeg(ffmpeg_args)
             return self._build_muxed_media(downloaded_media, output_path)
 
-        await self._mux_multiple_files(sorted_chunks, output_path, ffmpeg_threads)
         return self._build_muxed_media(downloaded_media, output_path)
 
     def _build_muxed_media(
@@ -160,29 +156,3 @@ class VideoMuxer(MediaMuxerProtocol):
     def _chunk_sort_key(self, chunk: DownloadedMediaChunk) -> tuple[int, int]:
         initialization_order = 0 if chunk.is_initialization_segment else 1
         return (initialization_order, chunk.sequence_number)
-
-    def _resolve_thread_count(self) -> int:
-        if self._configured_threads is not None and self._configured_threads > 0:
-            return self._configured_threads
-
-        if config.ffmpeg_threads is not None and config.ffmpeg_threads > 0:
-            return config.ffmpeg_threads
-
-        return max(1, (os.cpu_count() or 1) // 2)
-
-    async def _run_ffmpeg(self, ffmpeg_args: list[str]) -> None:
-        process = await asyncio.create_subprocess_exec(
-            *ffmpeg_args,
-            stdout=asyncio.subprocess.PIPE,
-            stderr=asyncio.subprocess.PIPE,
-        )
-        # Stdout
-        _, stderr = await process.communicate()
-        if process.returncode != 0:
-            decoded_error = stderr.decode("utf-8", errors="ignore")
-            return_code = process.returncode if process.returncode is not None else -1
-            raise FFmpegExecutionError(
-                command=ffmpeg_args,
-                return_code=return_code,
-                stderr=decoded_error,
-            )

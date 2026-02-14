@@ -11,6 +11,9 @@ from core.errors.media_related import (
     FFmpegExecutionError,
     HlsManifestNoMediaSegmentsError,
     HlsManifestNoVariantsError,
+    MediaMuxChunksDifferentExtensionsError,
+    MediaMuxChunksInDifferentPathsError,
+    MediaMuxMissingInitializationSegmentError,
     MediaMuxNoChunksError,
 )
 
@@ -30,4 +33,7 @@ __all__ = [
     "DirectMediaInvalidUrlError",
     "MediaMuxNoChunksError",
     "FFmpegExecutionError",
+    "MediaMuxChunksInDifferentPathsError",
+    "MediaMuxChunksDifferentExtensionsError",
+    "MediaMuxMissingInitializationSegmentError",
 ]
