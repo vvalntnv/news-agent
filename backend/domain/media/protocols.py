@@ -77,6 +77,12 @@ class MediaMuxerProtocol(Protocol):
     Protocol for muxing downloaded chunks/files into final media output.
     """
 
+    should_remove_downloaded_media: bool
+    """
+    A variable that dictates weather the media that was downloaded should be removed after muxing the media
+    If true, the muxer will deleted the DownloadedMedia from the disk.
+    """
+
     async def mux(
         self,
         downloaded_media: DownloadedMedia,

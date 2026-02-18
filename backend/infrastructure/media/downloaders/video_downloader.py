@@ -7,7 +7,6 @@ from urllib.parse import urlparse
 
 import aiofiles
 import httpx
-from concurrent.futures import ThreadPoolExecutor
 
 from core.config import config
 from domain.media.protocols import VideoDownloaderProtocol

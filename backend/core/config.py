@@ -37,6 +37,8 @@ class Config(BaseSettings):
     db_port: str = "5432"
     db_name: str = "news_agent"
 
+    should_remove_downloaded_media: bool = False
+
     @property
     def db_url(self) -> str:
         return (

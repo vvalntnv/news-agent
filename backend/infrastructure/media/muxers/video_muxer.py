@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 import os
 from pathlib import Path
 from uuid import uuid4
@@ -23,7 +24,11 @@ class VideoMuxer(MediaMuxerProtocol):
         static_media_root: Path | str | None = None,
         ffmpeg_binary: str | None = None,
         ffmpeg_threads: int | None = None,
+        should_remove_downloaded_media: bool | None = False,
     ) -> None:
+        self.should_remove_downloaded_media = (
+            should_remove_downloaded_media or config.should_remove_downloaded_media
+        )
         self._static_media_root = Path(static_media_root or config.media_static_root)
         self._ffmpeg_binary = ffmpeg_binary or config.ffmpeg_binary
         self._configured_threads = ffmpeg_threads
@@ -53,7 +58,12 @@ class VideoMuxer(MediaMuxerProtocol):
         )
 
         await command.execute_command()
-        return self._build_muxed_media(downloaded_media, output_path)
+        muxed_media = self._build_muxed_media(downloaded_media, output_path)
+
+        if self.should_remove_downloaded_media:
+            await self._remove_downloaded_media(downloaded_media)
+
+        return muxed_media
 
     def _build_command(
         self,
@@ -116,3 +126,36 @@ class VideoMuxer(MediaMuxerProtocol):
             return config.ffmpeg_threads
 
         return max(1, (os.cpu_count() or 1) // 2)
+
+    async def _remove_downloaded_media(self, downloaded_media: DownloadedMedia) -> None:
+        """
+        Removes downloaded chunks and their parent directory asynchronously.
+        """
+        if not downloaded_media.chunks:
+            return
+
+        def _remove_file(file_path: Path) -> None:
+            try:
+                if file_path.exists():
+                    file_path.unlink()
+            except OSError:
+                pass
+
+        def _remove_dir_if_empty(dir_path: Path) -> None:
+            try:
+                if dir_path.exists() and not any(dir_path.iterdir()):
+                    dir_path.rmdir()
+            except (OSError, StopIteration):
+                pass
+
+        # Parallel file deletion
+        deletion_tasks = [
+            asyncio.to_thread(_remove_file, chunk.file_path)
+            for chunk in downloaded_media.chunks
+        ]
+        await asyncio.gather(*deletion_tasks)
+
+        # Remove the directory if it's empty
+        parent_dirs = {chunk.file_path.parent for chunk in downloaded_media.chunks}
+        for parent_dir in parent_dirs:
+            await asyncio.to_thread(_remove_dir_if_empty, parent_dir)
