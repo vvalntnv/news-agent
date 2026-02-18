@@ -67,6 +67,84 @@ async def test_video_downloader_downloads_segments_in_order(tmp_path) -> None:
     await client.aclose()
 
 
+async def test_video_downloader_cleanup_on_failure(tmp_path) -> None:
+    # Setup: 2 chunks, the second one will fail
+    urls = [
+        MediaDownloadableLink(
+            url="https://example.com/chunk-1.ts",
+            sequence_number=1,
+            is_initialization_segment=False,
+        ),
+        MediaDownloadableLink(
+            url="https://example.com/chunk-2.ts",
+            sequence_number=2,
+            is_initialization_segment=False,
+        ),
+    ]
+
+    download_dir = tmp_path / "test_download"
+
+    async def handler(request: httpx.Request) -> httpx.Response:
+        if "chunk-1.ts" in str(request.url):
+            return httpx.Response(status_code=200, content=b"chunk-1 content")
+        # Fail for the second chunk
+        return httpx.Response(status_code=500)
+
+    client = httpx.AsyncClient(transport=httpx.MockTransport(handler))
+
+    downloader = VideoDownloader(
+        path_to_download=download_dir,
+        chunks_data=urls,
+        stream_type=SupportedStreamTypes.HLS,
+        source_url="https://example.com/master.m3u8",
+        client=client,
+    )
+
+    with pytest.raises(httpx.HTTPStatusError):
+        await downloader.download_video()
+
+    assert not download_dir.exists(), (
+        "Download directory should have been removed after failure"
+    )
+    await client.aclose()
+
+
+async def test_video_downloader_cleanup_on_early_failure(tmp_path) -> None:
+    # Setup: Failure happens before any download starts (e.g. first chunk fails immediately)
+    urls = [
+        MediaDownloadableLink(
+            url="https://example.com/chunk-1.ts",
+            sequence_number=1,
+            is_initialization_segment=False,
+        ),
+    ]
+
+    download_dir = tmp_path / "early_failure_dir"
+
+    async def handler(request: httpx.Request) -> httpx.Response:
+        return httpx.Response(status_code=500)
+
+    client = httpx.AsyncClient(transport=httpx.MockTransport(handler))
+
+    downloader = VideoDownloader(
+        path_to_download=download_dir,
+        chunks_data=urls,
+        stream_type=SupportedStreamTypes.HLS,
+        source_url="https://example.com/master.m3u8",
+        client=client,
+    )
+
+    with pytest.raises(httpx.HTTPStatusError):
+        await downloader.download_video()
+
+    # If no files were created, download_dir.iterdir() is empty.
+    # We want to ensure the directory itself is also cleaned up.
+    assert not download_dir.exists(), (
+        "Empty download directory should be removed after early failure"
+    )
+    await client.aclose()
+
+
 async def test_video_downloader_skips_sort_when_links_already_sorted(
     tmp_path, monkeypatch
 ) -> None:

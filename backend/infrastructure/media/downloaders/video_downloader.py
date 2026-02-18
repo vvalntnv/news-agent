@@ -16,9 +16,10 @@ from domain.media.value_objects import (
     DownloadedMediaChunk,
     MediaDownloadableLink,
 )
+from infrastructure.media.cleanup_mixin import MediaCleanupMixin
 
 
-class VideoDownloader(VideoDownloaderProtocol):
+class VideoDownloader(VideoDownloaderProtocol, MediaCleanupMixin):
     def __init__(
         self,
         path_to_download: Path | str,
@@ -53,10 +54,20 @@ class VideoDownloader(VideoDownloaderProtocol):
                         chunk=chunk,
                         chunk_index=index,
                         download_dir=download_dir,
+                        downloaded_chunks_reference=downloaded_chunks,
                     )
                 )
 
             downloaded_chunks = await asyncio.gather(*jobs)
+        except Exception as e:
+            files_to_delete = list(download_dir.iterdir())
+            await self._remove_downloaded_media(files_to_delete)
+
+            if download_dir.exists() and not files_to_delete:
+                self._remove_dir_if_empty(download_dir)
+
+            raise e
+
         finally:
             if self._is_client_owned:
                 await self._client.aclose()
@@ -80,6 +91,7 @@ class VideoDownloader(VideoDownloaderProtocol):
         chunk: MediaDownloadableLink,
         chunk_index: int,
         download_dir: Path,
+        downloaded_chunks_reference: list[DownloadedMediaChunk] | None = None,
     ) -> DownloadedMediaChunk:
         async with self._client.stream("GET", chunk.url) as stream:
             extension = self._extract_extension(chunk.url)
@@ -94,21 +106,17 @@ class VideoDownloader(VideoDownloaderProtocol):
                 async for content in stream.aiter_bytes():
                     await file.write(content)
 
-            return DownloadedMediaChunk(
+            media_chunk = DownloadedMediaChunk(
                 source_url=chunk.url,
                 file_path=file_path,
                 sequence_number=chunk.sequence_number,
                 is_initialization_segment=chunk.is_initialization_segment,
             )
 
-        # response = await self._client.get(chunk.url)
-        # response.raise_for_status()
-        #
-        # extension = self._extract_extension(chunk.url)
-        # segment_label = "init" if chunk.is_initialization_segment else "chunk"
-        # file_name = f"{chunk_index:05d}_{segment_label}{extension}"
-        # file_path = download_dir / file_name
-        # file_path.write_bytes(response.content)
+            if downloaded_chunks_reference:
+                downloaded_chunks_reference.append(media_chunk)
+
+            return media_chunk
 
     def _prepare_ordered_urls(self) -> list[MediaDownloadableLink]:
         if self._is_sorted(self.video_urls):
