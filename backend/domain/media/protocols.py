@@ -1,6 +1,7 @@
 from pathlib import Path
 from typing import Protocol, runtime_checkable
 
+from domain.media.supported_media_types import SupportedStreamTypes
 from domain.media.value_objects import (
     DownloadedMedia,
     MediaDownloadableLink,
@@ -42,6 +43,21 @@ class VideoDownloaderProtocol(Protocol):
 
 
 @runtime_checkable
+class VideoDownloaderFactoryProtocol(Protocol):
+    """
+    Protocol for creating video downloader instances.
+    """
+
+    def __call__(
+        self,
+        path_to_download: Path | str,
+        chunks_data: list[MediaDownloadableLink],
+        stream_type: SupportedStreamTypes,
+        source_url: str,
+    ) -> VideoDownloaderProtocol: ...
+
+
+@runtime_checkable
 class ImageDownloaderProtocol(Protocol):
     """
     Protocol for downloading images from resolved URLs.
@@ -75,6 +91,12 @@ class AudioDownloaderProtocol(Protocol):
 class MediaMuxerProtocol(Protocol):
     """
     Protocol for muxing downloaded chunks/files into final media output.
+    """
+
+    should_remove_downloaded_media: bool
+    """
+    A variable that dictates weather the media that was downloaded should be removed after muxing the media
+    If true, the muxer will deleted the DownloadedMedia from the disk.
     """
 
     async def mux(

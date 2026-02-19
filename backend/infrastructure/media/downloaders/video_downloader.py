@@ -2,12 +2,10 @@ from __future__ import annotations
 
 import asyncio
 from pathlib import Path
-from typing import Awaitable
 from urllib.parse import urlparse
 
 import aiofiles
 import httpx
-from concurrent.futures import ThreadPoolExecutor
 
 from core.config import config
 from domain.media.protocols import VideoDownloaderProtocol
@@ -17,9 +15,15 @@ from domain.media.value_objects import (
     DownloadedMediaChunk,
     MediaDownloadableLink,
 )
+from infrastructure.media.cleanup_mixin import MediaCleanupMixin
+from infrastructure.media.downloaders.async_retry_job_pool import (
+    AsyncRetryJobPool,
+    RetryJob,
+)
+from infrastructure.media.downloaders.retry_policy import RetryPolicy
 
 
-class VideoDownloader(VideoDownloaderProtocol):
+class VideoDownloader(VideoDownloaderProtocol, MediaCleanupMixin):
     def __init__(
         self,
         path_to_download: Path | str,
@@ -45,19 +49,14 @@ class VideoDownloader(VideoDownloaderProtocol):
 
         ordered_urls = self._prepare_ordered_urls()
 
-        downloaded_chunks: list[DownloadedMediaChunk] = []
         try:
-            jobs: list[Awaitable[DownloadedMediaChunk]] = []
-            for index, chunk in enumerate(ordered_urls):
-                jobs.append(
-                    self._download_chunk(
-                        chunk=chunk,
-                        chunk_index=index,
-                        download_dir=download_dir,
-                    )
-                )
-
-            downloaded_chunks = await asyncio.gather(*jobs)
+            downloaded_chunks = await self._download_chunks(
+                ordered_urls=ordered_urls,
+                download_dir=download_dir,
+            )
+        except Exception:
+            await self._cleanup_failed_download(download_dir)
+            raise
         finally:
             if self._is_client_owned:
                 await self._client.aclose()
@@ -68,32 +67,65 @@ class VideoDownloader(VideoDownloaderProtocol):
             chunks=downloaded_chunks,
         )
 
-    def _extract_extension(self, url: str) -> str:
-        parsed = urlparse(url)
-        extension = Path(parsed.path).suffix
-        if extension:
-            return extension
+    async def _download_chunks(
+        self,
+        ordered_urls: list[MediaDownloadableLink],
+        download_dir: Path,
+    ) -> list[DownloadedMediaChunk]:
+        jobs = [
+            self._build_chunk_job(chunk, index, download_dir)
+            for index, chunk in enumerate(ordered_urls)
+        ]
+        if not jobs:
+            return []
 
-        return ".bin"
+        pool = AsyncRetryJobPool[DownloadedMediaChunk](
+            jobs=jobs,
+            policy=self._build_retry_policy(),
+            concurrency=config.media_download_max_concurrency,
+        )
+        return await pool.run()
 
-    async def _download_chunk(
+    async def _cleanup_failed_download(self, download_dir: Path) -> None:
+        files_to_delete = list(download_dir.iterdir())
+        await self._remove_downloaded_media(files_to_delete)
+
+        if download_dir.exists() and not files_to_delete:
+            self._remove_dir_if_empty(download_dir)
+
+    def _build_retry_policy(self) -> RetryPolicy:
+        return RetryPolicy(
+            max_attempts=config.media_download_retry_max_attempts,
+            base_backoff_seconds=config.media_download_retry_base_backoff_seconds,
+            max_backoff_seconds=config.media_download_retry_max_backoff_seconds,
+            jitter_ratio=config.media_download_retry_jitter_ratio,
+            retryable_status_codes=config.media_download_retryable_status_codes,
+            fallback_penalty_seconds=config.media_download_retry_fallback_penalty_seconds,
+        )
+
+    def _build_chunk_job(
         self,
         chunk: MediaDownloadableLink,
         chunk_index: int,
         download_dir: Path,
-    ) -> DownloadedMediaChunk:
-        async with self._client.stream("GET", chunk.url) as stream:
-            extension = self._extract_extension(chunk.url)
-            segment_label = "init" if chunk.is_initialization_segment else "chunk"
+    ) -> RetryJob[DownloadedMediaChunk]:
+        extension = self._extract_extension(chunk.url)
+        segment_label = "init" if chunk.is_initialization_segment else "chunk"
+        file_name = f"{chunk_index:05d}_{segment_label}{extension}"
+        file_path = download_dir / file_name
 
-            file_name = f"{chunk_index:05d}_{segment_label}{extension}"
-            file_path = download_dir / file_name
+        async def attempt() -> DownloadedMediaChunk:
+            await self._remove_partial_file_if_exists(file_path)
+            try:
+                async with self._client.stream("GET", chunk.url) as stream:
+                    stream.raise_for_status()
 
-            stream.raise_for_status()
-
-            async with aiofiles.open(file_path, "wb") as file:
-                async for content in stream.aiter_bytes():
-                    await file.write(content)
+                    async with aiofiles.open(file_path, "wb") as file:
+                        async for content in stream.aiter_bytes():
+                            await file.write(content)
+            except Exception:
+                await self._remove_partial_file_if_exists(file_path)
+                raise
 
             return DownloadedMediaChunk(
                 source_url=chunk.url,
@@ -102,14 +134,21 @@ class VideoDownloader(VideoDownloaderProtocol):
                 is_initialization_segment=chunk.is_initialization_segment,
             )
 
-        # response = await self._client.get(chunk.url)
-        # response.raise_for_status()
-        #
-        # extension = self._extract_extension(chunk.url)
-        # segment_label = "init" if chunk.is_initialization_segment else "chunk"
-        # file_name = f"{chunk_index:05d}_{segment_label}{extension}"
-        # file_path = download_dir / file_name
-        # file_path.write_bytes(response.content)
+        return RetryJob(id=file_name, attempt=attempt)
+
+    async def _remove_partial_file_if_exists(self, file_path: Path) -> None:
+        if not file_path.exists():
+            return
+
+        await asyncio.to_thread(self._remove_file, file_path)
+
+    def _extract_extension(self, url: str) -> str:
+        parsed = urlparse(url)
+        extension = Path(parsed.path).suffix
+        if extension:
+            return extension
+
+        return ".bin"
 
     def _prepare_ordered_urls(self) -> list[MediaDownloadableLink]:
         if self._is_sorted(self.video_urls):

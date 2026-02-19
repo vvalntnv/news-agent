@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 import os
 from pathlib import Path
 from uuid import uuid4
@@ -9,6 +10,7 @@ from core.errors import MediaMuxNoChunksError
 from domain.media.protocols import MediaMuxerProtocol
 from domain.media.supported_media_types import SupportedStreamTypes
 from domain.media.value_objects import DownloadedMedia, DownloadedMediaChunk, MuxedMedia
+from infrastructure.media.cleanup_mixin import MediaCleanupMixin
 from infrastructure.media.muxers.ffmpeg.concatenate_dash_command import DASHFFMpegConcat
 from infrastructure.media.muxers.ffmpeg.concatenate_hls_command import HLSFFMpegConcat
 from infrastructure.media.muxers.ffmpeg.direct_file_compression_command import (
@@ -17,13 +19,17 @@ from infrastructure.media.muxers.ffmpeg.direct_file_compression_command import (
 from infrastructure.media.muxers.ffmpeg.ffmpeg_command import BaseFFMpegCommand
 
 
-class VideoMuxer(MediaMuxerProtocol):
+class VideoMuxer(MediaMuxerProtocol, MediaCleanupMixin):
     def __init__(
         self,
         static_media_root: Path | str | None = None,
         ffmpeg_binary: str | None = None,
         ffmpeg_threads: int | None = None,
+        should_remove_downloaded_media: bool | None = False,
     ) -> None:
+        self.should_remove_downloaded_media = (
+            should_remove_downloaded_media or config.should_remove_downloaded_media
+        )
         self._static_media_root = Path(static_media_root or config.media_static_root)
         self._ffmpeg_binary = ffmpeg_binary or config.ffmpeg_binary
         self._configured_threads = ffmpeg_threads
@@ -53,7 +59,12 @@ class VideoMuxer(MediaMuxerProtocol):
         )
 
         await command.execute_command()
-        return self._build_muxed_media(downloaded_media, output_path)
+        muxed_media = self._build_muxed_media(downloaded_media, output_path)
+
+        if self.should_remove_downloaded_media:
+            await self._remove_downloaded_media(downloaded_media)
+
+        return muxed_media
 
     def _build_command(
         self,

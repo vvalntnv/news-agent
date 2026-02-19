@@ -1,3 +1,4 @@
+from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 from dotenv import load_dotenv
 from pathlib import Path
@@ -15,6 +16,15 @@ class Config(BaseSettings):
     static_root: Path = Path("static")
     media_static_root: Path = Path("static/media")
     media_download_root: Path = Path("tmp/media-downloads")
+    media_download_max_concurrency: int = 4
+    media_download_retry_max_attempts: int = 3
+    media_download_retry_base_backoff_seconds: float = 0.5
+    media_download_retry_max_backoff_seconds: float = 10.0
+    media_download_retry_jitter_ratio: float = 0.25
+    media_download_retryable_status_codes: tuple[int, ...] = Field(
+        default_factory=lambda: (429, 502, 503, 504)
+    )
+    media_download_retry_fallback_penalty_seconds: float = 2.0
     media_http_user_agent: str = "Mozilla/5.0 (compatible; NewsAgent/1.0)"
     media_http_follow_redirects: bool = True
     media_http_timeout_seconds: float = 30.0
@@ -36,6 +46,8 @@ class Config(BaseSettings):
     db_host: str = "localhost"
     db_port: str = "5432"
     db_name: str = "news_agent"
+
+    should_remove_downloaded_media: bool = False
 
     @property
     def db_url(self) -> str:

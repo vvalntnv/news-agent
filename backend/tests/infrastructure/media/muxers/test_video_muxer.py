@@ -104,3 +104,43 @@ async def test_video_muxer_uses_concat_for_multiple_chunks(
 
     assert "-f" in captured_args
     assert "concat" in captured_args
+
+
+async def test_video_muxer_removes_downloaded_media(tmp_path, monkeypatch) -> None:
+    # Setup: Create a temp directory for downloads
+    download_dir = tmp_path / "downloads"
+    download_dir.mkdir()
+    chunk_file = download_dir / "chunk1.mp4"
+    chunk_file.write_bytes(b"data")
+
+    downloaded_media = DownloadedMedia(
+        source_url="https://example.com/video.mp4",
+        stream_type=SupportedStreamTypes.DIRECT,
+        chunks=[
+            DownloadedMediaChunk(
+                source_url="https://example.com/chunk1.mp4",
+                file_path=chunk_file,
+                sequence_number=1,
+            )
+        ],
+    )
+
+    # Stub FFmpeg
+    async def fake_subprocess_exec(*args: str, **_kwargs: object) -> _ProcessStub:
+        Path(args[-1]).write_bytes(b"muxed")
+        return _ProcessStub()
+
+    monkeypatch.setattr(
+        "infrastructure.media.muxers.ffmpeg.ffmpeg_command.asyncio.create_subprocess_exec",
+        fake_subprocess_exec,
+    )
+
+    # Test with should_remove_downloaded_media=True
+    muxer = VideoMuxer(
+        static_media_root=tmp_path / "static", should_remove_downloaded_media=True
+    )
+    await muxer.mux(downloaded_media, output_file_name="result")
+
+    # Verify: Chunk file and its parent directory should be gone
+    assert not chunk_file.exists()
+    assert not download_dir.exists()
