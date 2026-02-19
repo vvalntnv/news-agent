@@ -145,7 +145,7 @@ class HtmlExtractor(ContentExtractor):
                 if quote_text:
                     found_quotes.add(quote_text)
 
-        return sorted(found_quotes)
+        return list(found_quotes)
 
     def _retain_allowed_attributes(self, article_container: Tag) -> None:
         tags_to_process = [article_container, *article_container.find_all(True)]
