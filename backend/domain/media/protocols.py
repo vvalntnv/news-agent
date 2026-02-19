@@ -1,6 +1,7 @@
 from pathlib import Path
 from typing import Protocol, runtime_checkable
 
+from domain.media.supported_media_types import SupportedStreamTypes
 from domain.media.value_objects import (
     DownloadedMedia,
     MediaDownloadableLink,
@@ -39,6 +40,21 @@ class VideoDownloaderProtocol(Protocol):
     """Ordered list of URLs with metadata to download."""
 
     async def download_video(self) -> DownloadedMedia: ...
+
+
+@runtime_checkable
+class VideoDownloaderFactoryProtocol(Protocol):
+    """
+    Protocol for creating video downloader instances.
+    """
+
+    def __call__(
+        self,
+        path_to_download: Path | str,
+        chunks_data: list[MediaDownloadableLink],
+        stream_type: SupportedStreamTypes,
+        source_url: str,
+    ) -> VideoDownloaderProtocol: ...
 
 
 @runtime_checkable

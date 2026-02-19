@@ -61,6 +61,20 @@ Located in `backend/infrastructure/media/downloaders/`:
   - Preserves ordering via sequence numbers and init segment ordering.
   - Returns `DownloadedMedia`.
 
+  The downloader submits each chunk as a `RetryJob` to the shared
+  `AsyncRetryJobPool`, which constrains concurrency and retries. Retryable
+  HTTP errors (e.g., 429/503) activate a global soft-halt: new attempts
+  wait until the configured pause window expires before running. The pool
+  still lets in-flight requests finish so no work is lost on transient
+  overloads.
+
+  Retry knobs live in `backend/core/config.py` and include `media_download_max_concurrency`,
+  `media_download_retry_*` (max attempts/backoff/jitter/max backoff),
+  and `media_download_retry_fallback_penalty_seconds` to ensure a minimum
+  pause on every retry. The `RetryPolicy` interprets `Retry-After` headers
+  (numeric and HTTP-date) and picks the longest delay among the computed
+  backoff, configured fallback, or the header.
+
 `AudioDownloader` and `ImageDownloader` currently reuse the same chunk download
 mechanism.
 
