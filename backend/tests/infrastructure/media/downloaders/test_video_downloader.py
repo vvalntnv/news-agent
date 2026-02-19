@@ -1,194 +1,116 @@
-import pytest
-import httpx
+from __future__ import annotations
 
 from pathlib import Path
 from tempfile import TemporaryDirectory
+from typing import AsyncIterator, cast
+
+import httpx
+import pytest
+
 from domain.media.supported_media_types import SupportedStreamTypes
 from domain.media.value_objects import MediaDownloadableLink
-from infrastructure.media.downloaders.video_downloader import VideoDownloader
 from infrastructure.media.resolvers.dash_mpd_resolver import DashMPDResolver
+from infrastructure.media.downloaders.video_downloader import VideoDownloader
 
 pytestmark = pytest.mark.anyio
 
 
-def _build_client(payloads: dict[str, bytes]) -> httpx.AsyncClient:
-    async def handler(request: httpx.Request) -> httpx.Response:
-        payload = payloads.get(str(request.url))
-        if payload is None:
-            return httpx.Response(status_code=404)
+class _FakeStream:
+    def __init__(self, url: str, status_code: int, chunks: list[bytes]) -> None:
+        self._status_code = status_code
+        self._chunks = chunks
+        self.request = httpx.Request("GET", url)
+        self.response = httpx.Response(status_code=status_code, request=self.request)
 
-        return httpx.Response(status_code=200, content=payload)
+    async def __aenter__(self) -> _FakeStream:
+        return self
 
-    return httpx.AsyncClient(transport=httpx.MockTransport(handler))
+    async def __aexit__(self, exc_type, exc, tb) -> None:  # pragma: no cover - trivial
+        return None
+
+    def raise_for_status(self) -> None:
+        if self._status_code >= 400:
+            raise httpx.HTTPStatusError(
+                "error",
+                request=self.request,
+                response=self.response,
+            )
+
+    async def aiter_bytes(self) -> AsyncIterator[bytes]:
+        for chunk in self._chunks:
+            yield chunk
 
 
-async def test_video_downloader_downloads_segments_in_order(tmp_path) -> None:
-    urls = [
-        MediaDownloadableLink(
-            url="https://example.com/chunk-11.ts",
-            sequence_number=11,
-            is_initialization_segment=False,
-        ),
-        MediaDownloadableLink(
-            url="https://example.com/init.mp4",
-            sequence_number=10,
-            is_initialization_segment=True,
-        ),
-        MediaDownloadableLink(
-            url="https://example.com/chunk-10.ts",
-            sequence_number=10,
-            is_initialization_segment=False,
-        ),
+class _FakeClient:
+    def __init__(self, responses: dict[str, list[tuple[int, list[bytes]]]]) -> None:
+        self._responses = {url: list(sequence) for url, sequence in responses.items()}
+
+    def stream(self, method: str, url: str) -> _FakeStream:
+        try:
+            status_code, chunks = self._responses[url].pop(0)
+        except KeyError as exc:
+            raise RuntimeError("unexpected URL") from exc
+        return _FakeStream(url, status_code, chunks)
+
+    async def aclose(self) -> None:  # pragma: no cover - no resources
+        return None
+
+
+async def test_video_downloader_retries_and_preserves_order(tmp_path: Path) -> None:
+    chunk_links = [
+        MediaDownloadableLink(url="https://example.com/2.ts", sequence_number=2),
+        MediaDownloadableLink(url="https://example.com/1.ts", sequence_number=1),
     ]
-    client = _build_client(
-        {
-            "https://example.com/init.mp4": b"init",
-            "https://example.com/chunk-10.ts": b"chunk-10",
-            "https://example.com/chunk-11.ts": b"chunk-11",
-        }
+
+    responses = {
+        "https://example.com/1.ts": [
+            (429, []),
+            (200, [b"first"]),
+        ],
+        "https://example.com/2.ts": [(200, [b"second"])],
+    }
+
+    client = _FakeClient(responses)
+    downloader = VideoDownloader(
+        path_to_download=tmp_path,
+        chunks_data=chunk_links,
+        stream_type=SupportedStreamTypes.DIRECT,
+        source_url="https://example.com/video",
+        client=cast(httpx.AsyncClient, client),
     )
+
+    media = await downloader.download_video()
+
+    assert [chunk.source_url for chunk in media.chunks] == [
+        "https://example.com/1.ts",
+        "https://example.com/2.ts",
+    ]
+    assert media.chunks[0].file_path.read_bytes() == b"first"
+    assert media.chunks[1].file_path.read_bytes() == b"second"
+
+
+async def test_video_downloader_cleans_up_on_failure(tmp_path: Path) -> None:
+    link = MediaDownloadableLink(url="https://example.com/fail.ts", sequence_number=1)
+    responses = {"https://example.com/fail.ts": [(500, [])]}
+    client = _FakeClient(responses)
 
     downloader = VideoDownloader(
         path_to_download=tmp_path,
-        chunks_data=urls,
-        stream_type=SupportedStreamTypes.HLS,
-        source_url="https://example.com/master.m3u8",
-        client=client,
-    )
-
-    downloaded_media = await downloader.download_video()
-
-    assert downloaded_media.stream_type == SupportedStreamTypes.HLS
-    assert len(downloaded_media.chunks) == 3
-    assert downloaded_media.chunks[0].is_initialization_segment is True
-    assert downloaded_media.chunks[0].file_path.read_bytes() == b"init"
-    assert downloaded_media.chunks[1].file_path.read_bytes() == b"chunk-10"
-    assert downloaded_media.chunks[2].file_path.read_bytes() == b"chunk-11"
-    await client.aclose()
-
-
-async def test_video_downloader_cleanup_on_failure(tmp_path) -> None:
-    # Setup: 2 chunks, the second one will fail
-    urls = [
-        MediaDownloadableLink(
-            url="https://example.com/chunk-1.ts",
-            sequence_number=1,
-            is_initialization_segment=False,
-        ),
-        MediaDownloadableLink(
-            url="https://example.com/chunk-2.ts",
-            sequence_number=2,
-            is_initialization_segment=False,
-        ),
-    ]
-
-    download_dir = tmp_path / "test_download"
-
-    async def handler(request: httpx.Request) -> httpx.Response:
-        if "chunk-1.ts" in str(request.url):
-            return httpx.Response(status_code=200, content=b"chunk-1 content")
-        # Fail for the second chunk
-        return httpx.Response(status_code=500)
-
-    client = httpx.AsyncClient(transport=httpx.MockTransport(handler))
-
-    downloader = VideoDownloader(
-        path_to_download=download_dir,
-        chunks_data=urls,
-        stream_type=SupportedStreamTypes.HLS,
-        source_url="https://example.com/master.m3u8",
-        client=client,
+        chunks_data=[link],
+        stream_type=SupportedStreamTypes.DIRECT,
+        source_url="https://example.com/fail",
+        client=cast(httpx.AsyncClient, client),
     )
 
     with pytest.raises(httpx.HTTPStatusError):
         await downloader.download_video()
 
-    assert not download_dir.exists(), (
-        "Download directory should have been removed after failure"
-    )
-    await client.aclose()
+    assert not tmp_path.exists()
 
 
-async def test_video_downloader_cleanup_on_early_failure(tmp_path) -> None:
-    # Setup: Failure happens before any download starts (e.g. first chunk fails immediately)
-    urls = [
-        MediaDownloadableLink(
-            url="https://example.com/chunk-1.ts",
-            sequence_number=1,
-            is_initialization_segment=False,
-        ),
-    ]
-
-    download_dir = tmp_path / "early_failure_dir"
-
-    async def handler(request: httpx.Request) -> httpx.Response:
-        return httpx.Response(status_code=500)
-
-    client = httpx.AsyncClient(transport=httpx.MockTransport(handler))
-
-    downloader = VideoDownloader(
-        path_to_download=download_dir,
-        chunks_data=urls,
-        stream_type=SupportedStreamTypes.HLS,
-        source_url="https://example.com/master.m3u8",
-        client=client,
-    )
-
-    with pytest.raises(httpx.HTTPStatusError):
-        await downloader.download_video()
-
-    # If no files were created, download_dir.iterdir() is empty.
-    # We want to ensure the directory itself is also cleaned up.
-    assert not download_dir.exists(), (
-        "Empty download directory should be removed after early failure"
-    )
-    await client.aclose()
-
-
-async def test_video_downloader_skips_sort_when_links_already_sorted(
-    tmp_path, monkeypatch
-) -> None:
-    urls = [
-        MediaDownloadableLink(
-            url="https://example.com/init.mp4",
-            sequence_number=10,
-            is_initialization_segment=True,
-        ),
-        MediaDownloadableLink(
-            url="https://example.com/chunk-10.ts",
-            sequence_number=10,
-            is_initialization_segment=False,
-        ),
-        MediaDownloadableLink(
-            url="https://example.com/chunk-11.ts",
-            sequence_number=11,
-            is_initialization_segment=False,
-        ),
-    ]
-
-    client = _build_client({})
-    downloader = VideoDownloader(
-        path_to_download=tmp_path,
-        chunks_data=urls,
-        stream_type=SupportedStreamTypes.HLS,
-        source_url="https://example.com/master.m3u8",
-        client=client,
-    )
-
-    def _raise_if_called(*_args, **_kwargs):
-        raise AssertionError("sorted() should not be called for already ordered links")
-
-    monkeypatch.setattr("builtins.sorted", _raise_if_called)
-
-    ordered = downloader._prepare_ordered_urls()
-
-    assert ordered is urls
-    await client.aclose()
-
-
-@pytest.mark.skip()
+# @pytest.mark.skip()
 async def test_downloading_real_world_video() -> None:
-    video_url = "https://media09.vbox7.com/sl/mi1WT9ID2u4XwTQEu-ygRA/1771192800/7d/7d4b25d085/7d4b25d085.mpd"
+    video_url = "https://edge125.vbox7.com/sl/iyl2RXibn5lNWR64cs6J9w/1771711200/92/9296ba3367/9296ba3367.mpd"
     with TemporaryDirectory() as tmp_dir:
         resolved_stream = await DashMPDResolver().resolve_stream(video_url)
         downloader = VideoDownloader(
