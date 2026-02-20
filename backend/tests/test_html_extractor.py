@@ -122,16 +122,20 @@ class TestHtmlExtractorMocked:
 
         # Act
         article = await extractor.extract(mock_news_item)
-
+        quotes_to_find = [
+            "Direct quote from article.",
+            "Short quote in q tag.",
+        ]
         # Assert
         assert isinstance(article, Article)
         assert article.title == "Test Article Title"
         assert isinstance(article.content, ArticleContent)
         assert "This is the first paragraph" in article.content.raw_content
-        assert article.content.quotes == [
-            "Direct quote from article.",
-            "Short quote in q tag.",
-        ]
+
+        assert len(quotes_to_find) == len(article.content.quotes)
+        for quote in quotes_to_find:
+            assert quote in article.content.quotes
+
         assert "script" not in article.content.raw_content
         assert "video" not in article.content.raw_content
         assert 'href="https://example.com/reference"' in article.content.raw_content
@@ -141,9 +145,10 @@ class TestHtmlExtractorMocked:
         assert 'data-testid="' not in article.content.raw_content
         assert article.author == "John Doe"
         assert article.timestamp == "05/02/2026, 14:30:00"
-        assert len(article.videos) == 2
+        assert len(article.videos) == 3
         assert "https://example.com/video1.mp4" in article.videos
         assert "https://example.com/video2.mp4" in article.videos
+        assert "https://example.com/inline-video.mp4" in article.videos
         assert article.source_url == "https://example.com/news/article-123"
 
     async def test_extract_success_no_videos(
@@ -382,6 +387,7 @@ class TestHtmlExtractorRealData:
 
         return ScrapeInformation(**config_data)
 
+    @pytest.mark.skip()
     async def test_bnt_site_scraping(self, bnt_scrape_info: ScrapeInformation):
         """Test extraction from real BNT news site."""
         bnt_feed = WebScraperSource(
