@@ -389,7 +389,11 @@ class TestHtmlExtractorRealData:
         )
 
         news_items = await bnt_feed.check_for_news()
-        random_news_data = news_items[0]
+        # random_news_data = news_items[0]
+        random_news_data = NewsItem(
+            title="",
+            url="https://bntnews.bg/news/izcheznaliyat-korab-krai-sozopol-otkrito-e-nefteno-petno-v-moreto-predpolaga-se-che-e-potanal-1379969news.html",
+        )
 
         # Arrange
         extractor = HtmlExtractor(registered_scrapers=[bnt_scrape_info])
@@ -397,6 +401,7 @@ class TestHtmlExtractorRealData:
         try:
             # Act
             article = await extractor.extract(random_news_data)
+            breakpoint()
 
             # Assert
             assert isinstance(article, Article)

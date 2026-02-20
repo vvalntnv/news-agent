@@ -17,6 +17,6 @@
   "summaryContainers": [
     ".sub-title"
   ],
-  "mainArticleContainer": ".news-article-item",
+  "mainArticleContainer": ".all-news-wrap",
   "authorContainer": ".author > .name"
 }

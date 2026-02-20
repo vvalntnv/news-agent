@@ -1,12 +1,14 @@
 from datetime import datetime
+from typing import Iterable
 from urllib.parse import urlparse
 
-from bs4 import BeautifulSoup, Tag
 import httpx
+from bs4 import BeautifulSoup, Tag
+
 from core.errors import MissingArticleContentError
-from domain.news.entities import NewsItem, Article
+from domain.news.entities import Article, NewsItem
 from domain.news.protocols import ContentExtractor, Host
-from domain.news.value_objects import ScrapeInformation, ArticleContent
+from domain.news.value_objects import ArticleContent, ScrapeInformation
 
 
 class HtmlExtractor(ContentExtractor):
@@ -53,8 +55,10 @@ class HtmlExtractor(ContentExtractor):
             )  # TODO: Create custom error
 
         videos = None
-        if video_selectors := relevant_scraping_info.video_containers:
-            videos = self._extract_videos_from_page(soup, video_selectors)
+        videos = self._extract_videos_from_page(
+            soup,
+            relevant_scraping_info.video_containers,
+        )
 
         return Article(
             title=item.title,
@@ -159,21 +163,31 @@ class HtmlExtractor(ContentExtractor):
     def _extract_videos_from_page(
         self,
         soup: BeautifulSoup,
-        video_selectors: list[str],
+        video_selectors: list[str] | None = None,
     ) -> list[str]:
-        videos: list[str] = []
-        for video_selector in video_selectors:
-            videos_containers = soup.select(video_selector)
+        videos: set[str] = set()
 
+        def _traverse_containers(videos_containers: Iterable[Tag]):
             for container in videos_containers:
                 video_link = container.get("href")
                 does_video_exist = video_link is not None
                 is_tag_link = isinstance(video_link, str)
 
                 if does_video_exist and is_tag_link:
-                    videos.append(video_link)
+                    videos.add(video_link)
 
-        return videos
+        breakpoint()
+        video_tags = soup.find_all("video")
+        _traverse_containers(video_tags)
+
+        if not video_selectors:
+            return list(videos)
+
+        for video_selector in video_selectors:
+            videos_containers = soup.select(video_selector)
+            _traverse_containers(videos_containers)
+
+        return list(videos)
 
     def _get_relevant_scraper(self, item: NewsItem) -> ScrapeInformation:
         url_info = urlparse(item.url)
