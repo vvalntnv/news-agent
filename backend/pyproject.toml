@@ -23,6 +23,7 @@ dependencies = [
     "tortoise-orm[asyncpg]>=0.25.3",
     "uvicorn>=0.40.0",
     "pydantic-settings>=2.12.0",
+    "aiofiles>=25.1.0",
 ]
 
 [dependency-groups]
@@ -34,6 +35,6 @@ dev = [
 anyio_mode = "auto"
 
 [tool.aerich]
-tortoise_orm = "database.manager.TORTOISE_ORM"
+tortoise_orm = "core.config.config.tortoise_orm"
 location = "./migrations"
 src_folder = "./."

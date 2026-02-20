@@ -1,5 +1,22 @@
 from core.errors.article_related import MissingArticleContentError, MissingTitleError
 from core.errors.base import ClientError, ErrorPayload, InternalError
+from core.errors.media_related import (
+    DashManifestMissingAdaptationSetError,
+    DashManifestMissingPeriodError,
+    DashManifestMissingRepresentationError,
+    DashManifestNoDownloadLinksError,
+    DashManifestParseError,
+    DashManifestUnsupportedStructureError,
+    DirectMediaInvalidUrlError,
+    FFmpegExecutionError,
+    HlsManifestNoMediaSegmentsError,
+    HlsManifestNoVariantsError,
+    MediaMuxDirectRequiresSingleChunkError,
+    MediaMuxChunksDifferentExtensionsError,
+    MediaMuxChunksInDifferentPathsError,
+    MediaMuxMissingInitializationSegmentError,
+    MediaMuxNoChunksError,
+)
 
 __all__ = [
     "ClientError",
@@ -7,4 +24,19 @@ __all__ = [
     "InternalError",
     "MissingTitleError",
     "MissingArticleContentError",
+    "DashManifestParseError",
+    "DashManifestMissingPeriodError",
+    "DashManifestMissingAdaptationSetError",
+    "DashManifestMissingRepresentationError",
+    "DashManifestUnsupportedStructureError",
+    "DashManifestNoDownloadLinksError",
+    "HlsManifestNoVariantsError",
+    "HlsManifestNoMediaSegmentsError",
+    "DirectMediaInvalidUrlError",
+    "MediaMuxNoChunksError",
+    "MediaMuxDirectRequiresSingleChunkError",
+    "FFmpegExecutionError",
+    "MediaMuxChunksInDifferentPathsError",
+    "MediaMuxChunksDifferentExtensionsError",
+    "MediaMuxMissingInitializationSegmentError",
 ]

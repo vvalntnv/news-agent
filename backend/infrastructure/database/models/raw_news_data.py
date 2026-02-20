@@ -18,7 +18,7 @@ class RawNewsData(models.Model):
     quotes = fields.JSONField(default=list)
     created_at = fields.DatetimeField(auto_now_add=True)
 
-    class Meta:
+    class Meta: # type: ignore
         table = "raw_news_data"
 
     def __str__(self) -> str:
