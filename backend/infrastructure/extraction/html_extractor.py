@@ -167,25 +167,32 @@ class HtmlExtractor(ContentExtractor):
     ) -> list[str]:
         videos: set[str] = set()
 
-        def _traverse_containers(videos_containers: Iterable[Tag]):
-            for container in videos_containers:
-                video_link = container.get("href")
-                does_video_exist = video_link is not None
-                is_tag_link = isinstance(video_link, str)
+        def _collect_video_links(video_containers: Iterable[Tag]) -> None:
+            for container in video_containers:
+                href_value = container.get("href")
+                src_value = container.get("src")
 
-                if does_video_exist and is_tag_link:
-                    videos.add(video_link)
+                is_href_valid = isinstance(href_value, str) and bool(href_value)
+                is_src_valid = isinstance(src_value, str) and bool(src_value)
 
-        breakpoint()
+                if is_href_valid:
+                    videos.add(href_value)  # type: ignore (the types are validated)
+
+                if is_src_valid:
+                    videos.add(src_value)  # type: ignore (the types are validated)
+
         video_tags = soup.find_all("video")
-        _traverse_containers(video_tags)
+        _collect_video_links(video_tags)
+
+        source_tags = soup.find_all("source")
+        _collect_video_links(source_tags)
 
         if not video_selectors:
             return list(videos)
 
         for video_selector in video_selectors:
             videos_containers = soup.select(video_selector)
-            _traverse_containers(videos_containers)
+            _collect_video_links(videos_containers)
 
         return list(videos)
 
