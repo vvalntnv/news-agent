@@ -18,6 +18,7 @@ class Article(BaseModel):
     Represents a fully extracted news article.
     """
 
+    article_id: int | None = None
     title: str
     content: ArticleContent  # maps to raw_text + quotes
     media: list[Media] = Field(default_factory=list)

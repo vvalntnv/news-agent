@@ -1,5 +1,7 @@
 from typing import Protocol, List
 
+from infrastructure.database.models.raw_news_data.model import RawNewsData
+
 from .value_objects import ScrapeInformation
 from .entities import NewsItem, Article
 

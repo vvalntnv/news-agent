@@ -10,6 +10,7 @@ from infrastructure.media.downloaders.async_retry_job_pool import (
     RetryJob,
 )
 from infrastructure.media.downloaders.retry_policy import RetryPolicy
+from tests.utils.http_errors import build_http_status_error
 
 
 def _build_policy(**kwargs: object) -> RetryPolicy:
@@ -23,16 +24,6 @@ def _build_policy(**kwargs: object) -> RetryPolicy:
     }
     parameters.update(kwargs)
     return RetryPolicy(**parameters)
-
-
-# ReviewComment (through lines 29-32): Make this code reusable throuught the whole test. Add it to the utils/ directory of the test directory, and update the AGENTS.md file that there are utilities for the tests, so the AI knows. And add the ability to have headers. We should also creaete one test where the wait time is explicitly specified by the error response
-def _http_error(status_code: int) -> httpx.HTTPStatusError:
-    request = httpx.Request("GET", "https://example.com")
-    response = httpx.Response(status_code=status_code, request=request)
-    return httpx.HTTPStatusError("error", request=request, response=response)
-
-
-# EndReviewComment
 
 
 async def test_pool_respects_concurrency_limit() -> None:
@@ -75,7 +66,7 @@ async def test_pool_soft_halt_delays_new_attempts() -> None:
         if job1_attempts == 1:
             job1_failure_time = loop.time()
             job1_failure_event.set()
-            raise _http_error(429)
+            raise build_http_status_error(429)
         return "first"
 
     async def job_two() -> str:
@@ -108,7 +99,7 @@ async def test_pool_retries_on_retryable_error() -> None:
         nonlocal attempts
         attempts += 1
         if attempts == 1:
-            raise _http_error(429)
+            raise build_http_status_error(429)
         return "ok"
 
     pool = AsyncRetryJobPool(
@@ -122,7 +113,7 @@ async def test_pool_retries_on_retryable_error() -> None:
 
 async def test_pool_aborts_on_non_retryable_error() -> None:
     async def attempt() -> str:
-        raise _http_error(500)
+        raise build_http_status_error(500)
 
     pool = AsyncRetryJobPool(
         jobs=[RetryJob(id="bad", attempt=attempt)],
@@ -136,7 +127,7 @@ async def test_pool_aborts_on_non_retryable_error() -> None:
 
 async def test_pool_fails_after_exhausting_retries() -> None:
     async def attempt() -> str:
-        raise _http_error(429)
+        raise build_http_status_error(429)
 
     pool = AsyncRetryJobPool(
         jobs=[RetryJob(id="loop", attempt=attempt)],
@@ -146,3 +137,45 @@ async def test_pool_fails_after_exhausting_retries() -> None:
 
     with pytest.raises(httpx.HTTPStatusError):
         await pool.run()
+
+
+async def test_pool_uses_retry_after_header_delay() -> None:
+    attempts = 0
+    retry_after_seconds = 1.0
+    observed_delay: float | None = None
+
+    policy = _build_policy(
+        base_backoff_seconds=0.01,
+        max_backoff_seconds=1.0,
+        fallback_penalty_seconds=0.0,
+    )
+
+    async def on_retry(
+        _job_id: str,
+        _error: Exception,
+        _attempt: int,
+        delay: float,
+    ) -> None:
+        nonlocal observed_delay
+        observed_delay = delay
+
+    async def attempt() -> str:
+        nonlocal attempts
+        attempts += 1
+        if attempts == 1:
+            raise build_http_status_error(
+                429,
+                headers={"Retry-After": "1"},
+            )
+        return "ok"
+
+    pool = AsyncRetryJobPool[str](
+        jobs=[RetryJob(id="retry-after", attempt=attempt, on_retry=on_retry)],
+        policy=policy,
+        concurrency=1,
+    )
+
+    assert await pool.run() == ["ok"]
+    assert observed_delay is not None
+    assert observed_delay >= retry_after_seconds
+    assert observed_delay == pytest.approx(retry_after_seconds, abs=0.05)

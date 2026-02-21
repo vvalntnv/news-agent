@@ -93,6 +93,10 @@ Run these from `backend/`.
 - `uv run pytest`
 - `uv run pytest -q`
 
+### Test with Coverage
+- `uv run pytest --cov --cov-report=html` - run tests with coverage and generate HTML report
+- Open `htmlcov/index.html` in browser to examine results
+
 ### Test (single test) - key commands
 - Single file:
   - `uv run pytest tests/test_rss_source.py`

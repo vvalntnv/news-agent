@@ -12,9 +12,19 @@ class TortoiseArticleRepository(ArticleRepository):
     """Tortoise ORM implementation of the ArticleRepository."""
 
     async def create_article(self, article: Article) -> Article:
-        raw_data = await self._ensure_raw_news_data(article)
+        raw_data = await self._create_raw_article_data(article)
         article_entry = await self._create_article_record(article, raw_data)
         await self._ensure_media_for_article(article, article_entry)
+        return article
+
+    async def get_article_by_id(self, id: int) -> Article:
+        article_entry = await ArticleEntry.get_or_none(id=id)
+        if article_entry is None:
+            raise Exception("No article with this id exists")  # TODO: External error
+
+        article = article_mapper.map_article_entry_to_domain(article_entry)
+        assert article is not None, "This should never happen"
+
         return article
 
     async def retrieve_article(self, url: str) -> Article | None:
@@ -25,8 +35,12 @@ class TortoiseArticleRepository(ArticleRepository):
         return article_mapper.map_article_entry_to_domain(article_entry)
 
     async def update_article(self, article: Article) -> Article:
-        raw_data = await self._ensure_raw_news_data(article)
-        article_entry = await self._get_article_by_url(article.source_url or "")
+        raw_data = await self._update_raw_article_data(article)
+        article_entry = (
+            await ArticleEntry.get_or_none(id=article.article_id)
+            if article.article_id
+            else await self._get_article_by_url(article.source_url or "")
+        )
 
         if article_entry is None:
             article_entry = await self._create_article_record(article, raw_data)
@@ -48,28 +62,37 @@ class TortoiseArticleRepository(ArticleRepository):
         article_entry = await self._get_article_by_url(url)
         return article_entry is not None
 
-    async def _ensure_raw_news_data(self, article: Article) -> RawNewsData:
-        existing_raw: RawNewsData | None = None
-        if article.source_url:
-            existing_raw = await RawNewsData.filter(url=article.source_url).first()
-
+    async def _update_raw_article_data(self, article: Article) -> RawNewsData:
+        existing_raw = await RawNewsData.filter(url=article.source_url).first()
         if existing_raw is None:
-            return await RawNewsData.create(
-                title=article.title,
-                raw_text=article.content.raw_content,
-                quotes=article.content.quotes,
-                url=article.source_url,
-                author=article.author,
-                timestamp=article.timestamp,
-            )
+            raise Exception(
+                "RawNewsData does not exist"
+            )  # TODO: Create custom external error
 
         existing_raw.title = article.title
         existing_raw.raw_text = article.content.raw_content
         existing_raw.quotes = article.content.quotes
         existing_raw.author = article.author
         existing_raw.timestamp = article.timestamp
+
         await existing_raw.save()
         return existing_raw
+
+    async def _create_raw_article_data(self, article: Article) -> RawNewsData:
+        existing_raw = await RawNewsData.filter(url=article.source_url).first()
+        if existing_raw is not None:
+            raise Exception(
+                "RawNewsData with this url already exists. Cannot create a new one"
+            )  # TODO: Create custom external error
+
+        return await RawNewsData.create(
+            title=article.title,
+            raw_text=article.content.raw_content,
+            quotes=article.content.quotes,
+            url=article.source_url,
+            author=article.author,
+            timestamp=article.timestamp,
+        )
 
     async def _create_article_record(
         self,
