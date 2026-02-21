@@ -1,14 +1,29 @@
 from datetime import datetime
-from typing import Iterable
-from urllib.parse import urlparse
+from urllib.parse import urljoin, urlparse
 
 import httpx
 from bs4 import BeautifulSoup, Tag
 
-from core.errors import MissingArticleContentError
+from core.errors import (
+    MissingArticleContentError,
+    MissingAuthorError,
+    NoScraperFoundError,
+)
 from domain.news.entities import Article, NewsItem
 from domain.news.protocols import ContentExtractor, Host
-from domain.news.value_objects import ArticleContent, ScrapeInformation
+from domain.news.value_objects import (
+    ArticleContent,
+    Media,
+    MediaType,
+    ScrapeInformation,
+)
+from infrastructure.extraction.media_extraction_strategies import (
+    MediaExtractionStrategy,
+)
+
+from .media_extraction_strategies.helpers.strategy_execution_plan_helpers import (
+    create_default_comperhansive_media_collection_strategy_execution_plan,
+)
 
 
 class HtmlExtractor(ContentExtractor):
@@ -20,6 +35,9 @@ class HtmlExtractor(ContentExtractor):
         self,
         registered_scrapers: list[ScrapeInformation],
         attrs_to_retain: tuple[str, ...] | list[str] = ("href",),
+        media_collection_strategy_execution_plan: (
+            tuple[MediaExtractionStrategy, ...] | None
+        ) = None,
     ) -> None:
         self.scraping_informations: dict[Host, ScrapeInformation] = {
             info.get_host(): info for info in registered_scrapers
@@ -27,6 +45,10 @@ class HtmlExtractor(ContentExtractor):
         self.attrs_to_retain: set[str] = {
             attribute.lower() for attribute in attrs_to_retain
         }
+        self.media_collection_strategy_execution_plan = (
+            media_collection_strategy_execution_plan
+            or create_default_comperhansive_media_collection_strategy_execution_plan()
+        )
         self.client = httpx.AsyncClient(
             headers={
                 "User-Agent": "Mozilla/5.0 (compatible; NewsAgent/1.0)",
@@ -50,20 +72,21 @@ class HtmlExtractor(ContentExtractor):
         author_container = soup.select_one(relevant_scraping_info.author_container)
 
         if author_container is None:
-            raise Exception(
-                "There is no available article content for this news"
-            )  # TODO: Create custom error
+            raise MissingAuthorError(
+                scraping_url=relevant_scraping_info.scraping_url,
+                selector=relevant_scraping_info.author_container,
+            )
 
-        videos = None
-        videos = self._extract_videos_from_page(
+        media_items = self._extract_media(
             soup,
-            relevant_scraping_info.video_containers,
+            relevant_scraping_info,
+            base_url=item.url,
         )
 
         return Article(
             title=item.title,
             content=article_content,
-            videos=videos or [],
+            media=media_items,
             author=author_container.get_text(),
             timestamp=(
                 timestamp.get_text()
@@ -99,7 +122,7 @@ class HtmlExtractor(ContentExtractor):
 
         self._strip_irrelevant_tags(
             container_root,
-            relevant_scraping_info.video_containers,
+            self._gather_media_selectors(relevant_scraping_info),
         )
         quotes = self._extract_quotes(container_root)
         self._retain_allowed_attributes(container_root)
@@ -112,7 +135,7 @@ class HtmlExtractor(ContentExtractor):
     def _strip_irrelevant_tags(
         self,
         article_container: Tag,
-        video_selectors: list[str] | None,
+        selectors: list[str] | None,
     ) -> None:
         irrelevant_tags = (
             "audio",
@@ -134,8 +157,8 @@ class HtmlExtractor(ContentExtractor):
             for tag in article_container.find_all(tag_name):
                 tag.decompose()
 
-        if video_selectors:
-            for selector in video_selectors:
+        if selectors:
+            for selector in selectors:
                 for tag in article_container.select(selector):
                     tag.decompose()
 
@@ -154,47 +177,71 @@ class HtmlExtractor(ContentExtractor):
     def _retain_allowed_attributes(self, article_container: Tag) -> None:
         tags_to_process = [article_container, *article_container.find_all(True)]
         for tag in tags_to_process:
-            retained_attributes: dict[str, object] = {}
+            retained_attributes: dict[str, str | list[str]] = {}
             for attribute_name, attribute_value in tag.attrs.items():
                 if attribute_name.lower() in self.attrs_to_retain:
                     retained_attributes[attribute_name] = attribute_value
-            tag.attrs = retained_attributes
+            tag.attrs = retained_attributes  # type: ignore[assignment]
 
-    def _extract_videos_from_page(
+    def _gather_media_selectors(
+        self, relevant_scraping_info: ScrapeInformation
+    ) -> list[str] | None:
+        selectors: list[str] = []
+        for group in (
+            relevant_scraping_info.image_containers,
+            relevant_scraping_info.video_containers,
+            relevant_scraping_info.audio_containers,
+        ):
+            if group:
+                selectors.extend(group)
+
+        return selectors or None
+
+    def _extract_media(
         self,
         soup: BeautifulSoup,
-        video_selectors: list[str] | None = None,
-    ) -> list[str]:
-        videos: set[str] = set()
+        relevant_scraping_info: ScrapeInformation,
+        base_url: str,
+    ) -> list[Media]:
+        seen_urls: set[str] = set()
+        media_items: list[Media] = []
 
-        def _collect_video_links(video_containers: Iterable[Tag]) -> None:
-            for container in video_containers:
-                href_value = container.get("href")
-                src_value = container.get("src")
+        def register_normalized_media(
+            url_value: str | None, media_type: MediaType
+        ) -> None:
+            normalized_url = self._normalize_media_url(url_value, base_url)
+            if normalized_url and normalized_url not in seen_urls:
+                seen_urls.add(normalized_url)
+                media_items.append(
+                    Media(
+                        media_type=media_type,
+                        article_url=normalized_url,
+                        local_url=None,
+                    )
+                )
 
-                is_href_valid = isinstance(href_value, str) and bool(href_value)
-                is_src_valid = isinstance(src_value, str) and bool(src_value)
+        for media_collection_strategy in self.media_collection_strategy_execution_plan:
+            media_collection_strategy.collect(
+                soup=soup,
+                scrape_information=relevant_scraping_info,
+                add_media_callback=register_normalized_media,
+            )
 
-                if is_href_valid:
-                    videos.add(href_value)  # type: ignore (the types are validated)
+        return media_items
 
-                if is_src_valid:
-                    videos.add(src_value)  # type: ignore (the types are validated)
+    def _normalize_media_url(self, candidate: str | None, base_url: str) -> str | None:
+        if not candidate or not isinstance(candidate, str):
+            return None
 
-        video_tags = soup.find_all("video")
-        _collect_video_links(video_tags)
+        cleaned_candidate = candidate.strip()
+        if not cleaned_candidate:
+            return None
 
-        source_tags = soup.find_all("source")
-        _collect_video_links(source_tags)
+        joined = urljoin(base_url, cleaned_candidate)
+        parsed = urlparse(joined)
+        normalized = parsed._replace(fragment="").geturl()
 
-        if not video_selectors:
-            return list(videos)
-
-        for video_selector in video_selectors:
-            videos_containers = soup.select(video_selector)
-            _collect_video_links(videos_containers)
-
-        return list(videos)
+        return normalized
 
     def _get_relevant_scraper(self, item: NewsItem) -> ScrapeInformation:
         url_info = urlparse(item.url)
@@ -205,8 +252,6 @@ class HtmlExtractor(ContentExtractor):
         relevant_scraping_info = self.scraping_informations.get(host)
 
         if relevant_scraping_info is None:
-            raise Exception(
-                "No relevant scraper found for this news website"
-            )  # TODO: Create custom errors
+            raise NoScraperFoundError(url=item.url, host=host)
 
         return relevant_scraping_info

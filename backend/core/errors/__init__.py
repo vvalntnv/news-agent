@@ -1,4 +1,9 @@
-from core.errors.article_related import MissingArticleContentError, MissingTitleError
+from core.errors.article_related import (
+    MissingArticleContentError,
+    MissingAuthorError,
+    MissingTitleError,
+    NoScraperFoundError,
+)
 from core.errors.base import ClientError, ErrorPayload, InternalError
 from core.errors.media_related import (
     DashManifestMissingAdaptationSetError,
@@ -24,6 +29,8 @@ __all__ = [
     "InternalError",
     "MissingTitleError",
     "MissingArticleContentError",
+    "MissingAuthorError",
+    "NoScraperFoundError",
     "DashManifestParseError",
     "DashManifestMissingPeriodError",
     "DashManifestMissingAdaptationSetError",
