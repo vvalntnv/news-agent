@@ -6,7 +6,7 @@ from tortoise.contrib.pydantic import pydantic_model_creator
 class NewsData(models.Model):
     """Model to store processed news data by the agents."""
 
-    id = fields.IntField(pk=True)
+    id = fields.IntField(primary_key=True)
     summary = fields.TextField()
     fact_check_summary = fields.TextField()
     fact_check_urls = fields.JSONField(default=list)

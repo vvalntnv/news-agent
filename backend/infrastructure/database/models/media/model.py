@@ -8,7 +8,7 @@ from tortoise.contrib.pydantic import pydantic_model_creator
 class NewsMedia(models.Model):
     """Model to store media source information."""
 
-    id = fields.IntField(pk=True)
+    id = fields.IntField(primary_key=True)
     name = fields.CharField(max_length=255, null=True)
     site_url = fields.CharField(max_length=512, unique=True, db_index=True)
     trustworthiness = fields.FloatField(default=0.0)
@@ -33,7 +33,7 @@ NewsMediaSchema = pydantic_model_creator(NewsMedia, name="NewsMediaSchema")
 class ArticleMedia(models.Model):
     """Persistent metadata for a specific article's media asset."""
 
-    id = fields.IntField(pk=True)
+    id = fields.IntField(primary_key=True)
     article = fields.ForeignKeyField(
         "models.Article",
         related_name="media_items",

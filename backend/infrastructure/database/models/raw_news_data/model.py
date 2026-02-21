@@ -6,7 +6,7 @@ from tortoise.contrib.pydantic import pydantic_model_creator
 class RawNewsData(models.Model):
     """Model to store raw news data scraped from websites."""
 
-    id = fields.IntField(pk=True)
+    id = fields.IntField(primary_key=True)
     raw_text = fields.TextField()
     title = fields.CharField(max_length=512)
     url = fields.CharField(max_length=2048, null=True, unique=True)

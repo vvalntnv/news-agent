@@ -10,7 +10,7 @@ from tortoise.contrib.pydantic import pydantic_model_creator
 class Article(models.Model):
     """Model to store individual articles from different media sources."""
 
-    id = fields.IntField(pk=True)
+    id = fields.IntField(primary_key=True)
     media = fields.ForeignKeyField(
         "models.NewsMedia",
         related_name="articles",
