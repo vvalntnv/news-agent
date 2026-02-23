@@ -28,8 +28,7 @@ class ETLManager:
 
                 for item in items:
                     # 2. Check if already exists (Optimization)
-                    existing = await self.repository.get_by_url(item.url)
-                    if existing:
+                    if await self.repository.article_exists(item.url):
                         continue
 
                     # 3. Extract Content
@@ -37,7 +36,7 @@ class ETLManager:
                         article = await self.extractor.extract(item)
 
                         # 4. Save to Repository
-                        await self.repository.save(article)
+                        await self.repository.create_article(article)
                     except NotImplementedError:
                         # Skip extraction if not implemented (for now)
                         print(f"Extraction not implemented for {item.url}")

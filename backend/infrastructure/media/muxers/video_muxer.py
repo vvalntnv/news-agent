@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import asyncio
 import os
 from pathlib import Path
 from uuid import uuid4

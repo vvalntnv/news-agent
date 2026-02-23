@@ -1,6 +1,6 @@
 from pydantic import BaseModel, Field
 
-from domain.news.value_objects import ArticleContent
+from domain.news.value_objects import ArticleContent, Media
 
 
 class NewsItem(BaseModel):
@@ -18,9 +18,10 @@ class Article(BaseModel):
     Represents a fully extracted news article.
     """
 
+    article_id: int | None = None
     title: str
     content: ArticleContent  # maps to raw_text + quotes
-    videos: list[str] = Field(default_factory=list)
+    media: list[Media] = Field(default_factory=list)
     timestamp: str
     author: str
-    source_url: str | None = None
+    article_url: str | None = None

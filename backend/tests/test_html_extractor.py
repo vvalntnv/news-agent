@@ -4,8 +4,9 @@ from pathlib import Path
 from unittest.mock import AsyncMock, MagicMock
 from datetime import datetime
 
+from core.errors.article_related import MissingAuthorError
 from domain.news.entities import NewsItem, Article
-from domain.news.value_objects import ArticleContent, ScrapeInformation
+from domain.news.value_objects import ArticleContent, MediaType, ScrapeInformation
 from infrastructure.extraction.html_extractor import HtmlExtractor
 from infrastructure.sources.web_scraper_source import WebScraperSource
 
@@ -22,6 +23,8 @@ def mock_scrape_info():
         mainArticleContainer=".article-content",
         authorContainer=".author-name",
         videoContainers=[".video-link"],
+        imageContainers=[".image-link"],
+        audioContainers=[".audio-link"],
     )
 
 
@@ -46,12 +49,24 @@ def sample_html_content():
             <h1 class="title">Test Article Title</h1>
             <div class="article-body" style="color:red">
                 <p>This is the first paragraph of the article.</p>
-                <blockquote class="quote-box">Direct quote from article.</blockquote>
+                <a class="image-link" href="https://example.com/article-image.jpg">Image Link</a>
+                <img class="hero-image" src="https://example.com/article-image.jpg">
+                <picture>
+                    <source src="https://example.com/picture-image.jpg" type="image/jpeg">
+                    <img src="https://example.com/article-image.jpg">
+                </picture>
                 <p>This is the second paragraph with more content.</p>
+                <blockquote class="quote-box">Direct quote from article.</blockquote>
                 <q data-owner="editor">Short quote in q tag.</q>
+                <audio controls class="audio-player">
+                    <source src="https://example.com/audio-track.mp3" type="audio/mpeg">
+                </audio>
+                <video controls>
+                    <source src="https://example.com/inline-video.mp4" type="video/mp4">
+                    <source src="https://example.com/inline-audio-track.mp3" type="audio/mpeg">
+                </video>
                 <p>Here is the conclusion of the article.</p>
                 <a class="related-link" href="https://example.com/reference" data-testid="ref-link">Reference</a>
-                <video controls src="https://example.com/inline-video.mp4"></video>
                 <div class="video-link">Embedded video link</div>
                 <script>console.log("ignore this")</script>
             </div>
@@ -63,6 +78,9 @@ def sample_html_content():
         <div class="videos">
             <a class="video-link" href="https://example.com/video1.mp4">Video 1</a>
             <a class="video-link" href="https://example.com/video2.mp4">Video 2</a>
+        </div>
+        <div class="audios">
+            <a class="audio-link" href="https://example.com/audio-guide.mp3">Audio Guide</a>
         </div>
     </body>
     </html>
@@ -108,10 +126,10 @@ def sample_html_no_timestamp():
 class TestHtmlExtractorMocked:
     """Tests for HtmlExtractor using mocked data."""
 
-    async def test_extract_success_with_videos(
+    async def test_extract_success_with_media(
         self, mock_scrape_info, mock_news_item, sample_html_content
     ):
-        """Test successful extraction with videos."""
+        """Test successful extraction with media."""
         # Arrange
         extractor = HtmlExtractor(registered_scrapers=[mock_scrape_info])
 
@@ -145,16 +163,31 @@ class TestHtmlExtractorMocked:
         assert 'data-testid="' not in article.content.raw_content
         assert article.author == "John Doe"
         assert article.timestamp == "05/02/2026, 14:30:00"
-        assert len(article.videos) == 3
-        assert "https://example.com/video1.mp4" in article.videos
-        assert "https://example.com/video2.mp4" in article.videos
-        assert "https://example.com/inline-video.mp4" in article.videos
-        assert article.source_url == "https://example.com/news/article-123"
+        assert any(media.media_type == MediaType.VIDEO for media in article.media)
+        assert any(media.media_type == MediaType.IMAGE for media in article.media)
+        assert any(media.media_type == MediaType.AUDIO for media in article.media)
 
-    async def test_extract_success_no_videos(
+        media_urls = {media.source_url for media in article.media}
+        assert "https://example.com/video1.mp4" in media_urls
+        assert "https://example.com/video2.mp4" in media_urls
+        assert "https://example.com/inline-video.mp4" in media_urls
+        assert "https://example.com/article-image.jpg" in media_urls
+        assert "https://example.com/picture-image.jpg" in media_urls
+        assert "https://example.com/audio-guide.mp3" in media_urls
+        assert "https://example.com/audio-track.mp3" in media_urls
+
+        inline_audio_entries = [
+            media
+            for media in article.media
+            if media.source_url == "https://example.com/audio-track.mp3"
+        ]
+        assert len(inline_audio_entries) == 1
+        assert article.article_url == "https://example.com/news/article-123"
+
+    async def test_extract_success_no_media(
         self, mock_scrape_info, mock_news_item, sample_html_no_videos
     ):
-        """Test successful extraction without videos."""
+        """Test successful extraction without media."""
         # Arrange
         extractor = HtmlExtractor(registered_scrapers=[mock_scrape_info])
 
@@ -173,7 +206,49 @@ class TestHtmlExtractorMocked:
         assert article.content.quotes == []
         assert article.author == "Jane Smith"
         assert article.timestamp == "05/02/2026, 10:00:00"
-        assert article.videos == []
+        assert article.media == []
+
+    async def test_extract_source_audio_not_misclassified(
+        self, mock_scrape_info, mock_news_item
+    ):
+        """Ensure audio <source> inside video is classified correctly."""
+
+        html_with_audio_sources = """
+        <!DOCTYPE html>
+        <html>
+        <body>
+            <article class="article-content">
+                <video controls>
+                    <source src="https://example.com/source-audio.mp3" type="audio/mpeg">
+                    <source src="https://example.com/source-video.mp4" type="video/mp4">
+                </video>
+            </article>
+            <span class="author-name">Test Author</span>
+            <time class="timestamp">05/02/2026, 16:00:00</time>
+        </body>
+        </html>
+        """
+
+        extractor = HtmlExtractor(registered_scrapers=[mock_scrape_info])
+        mock_response = MagicMock()
+        mock_response.content = html_with_audio_sources.encode("utf-8")
+        extractor.client.get = AsyncMock(return_value=mock_response)
+
+        article = await extractor.extract(mock_news_item)
+
+        matching_audio = [
+            media
+            for media in article.media
+            if media.source_url == "https://example.com/source-audio.mp3"
+        ]
+
+        assert matching_audio
+        assert matching_audio[0].media_type == MediaType.AUDIO
+        assert not any(
+            media.media_type == MediaType.VIDEO
+            and media.source_url == "https://example.com/source-audio.mp3"
+            for media in article.media
+        )
 
     async def test_extract_respects_custom_attributes_to_retain(
         self, mock_scrape_info, mock_news_item
@@ -282,7 +357,9 @@ class TestHtmlExtractorMocked:
         assert "no available article content" in str(exc_info.value).lower()
 
     async def test_extract_no_author_raises_exception(
-        self, mock_scrape_info, mock_news_item
+        self,
+        mock_scrape_info,
+        mock_news_item,
     ):
         """Test that extraction raises exception when author container not found."""
         # Arrange
@@ -307,7 +384,7 @@ class TestHtmlExtractorMocked:
         with pytest.raises(Exception) as exc_info:
             await extractor.extract(mock_news_item)
 
-        assert "no available article content" in str(exc_info.value).lower()
+        assert exc_info.errisinstance(MissingAuthorError)
 
     async def test_multiple_scrapers_registered(self, mock_news_item):
         """Test that extractor correctly selects scraper based on URL host."""
@@ -387,7 +464,6 @@ class TestHtmlExtractorRealData:
 
         return ScrapeInformation(**config_data)
 
-    @pytest.mark.skip()
     async def test_bnt_site_scraping(self, bnt_scrape_info: ScrapeInformation):
         """Test extraction from real BNT news site."""
         bnt_feed = WebScraperSource(
@@ -395,11 +471,7 @@ class TestHtmlExtractorRealData:
         )
 
         news_items = await bnt_feed.check_for_news()
-        # random_news_data = news_items[0]
-        random_news_data = NewsItem(
-            title="",
-            url="https://bntnews.bg/news/sluzhebniyat-finansov-ministar-shte-vnese-do-dni-v-ns-udalzhitelnoto-deistvie-na-byujet-2025-1380596news.html",
-        )
+        random_news_data = news_items[0]
 
         # Arrange
         extractor = HtmlExtractor(registered_scrapers=[bnt_scrape_info])
@@ -407,17 +479,16 @@ class TestHtmlExtractorRealData:
         try:
             # Act
             article = await extractor.extract(random_news_data)
-            breakpoint()
 
             # Assert
             assert isinstance(article, Article)
             assert article.title in random_news_data.title
             assert article.content is not None
             assert len(article.content.raw_content) > 0
-            assert article.source_url == random_news_data.url
+            assert article.article_url == random_news_data.url
 
-            # Videos may or may not be present depending on the article
-            assert isinstance(article.videos, list)
+            # Media may or may not be present depending on the article
+            assert isinstance(article.media, list)
 
             # Timestamp should be present (either scraped or fallback)
             assert article.timestamp is not None
@@ -425,7 +496,7 @@ class TestHtmlExtractorRealData:
 
             print("Successfully extracted article from BNT")
             print(f"Content length: {len(article.content.raw_content)} characters")
-            print(f"Videos found: {len(article.videos)}")
+            print(f"Media found: {len(article.media)}")
             print(f"Timestamp: {article.timestamp}")
 
         except Exception as e:

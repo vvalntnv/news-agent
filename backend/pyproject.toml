@@ -10,29 +10,36 @@ dependencies = [
     "fastapi>=0.128.0",
     "greenlet>=3.3.1",
     "httpx>=0.28.1",
-    "langchain[ollama]>=1.2.7",
-    "langchain-community>=0.4.1",
-    "langchain-openai>=1.1.7",
-    "langgraph>=1.0.7",
     "lxml[html-clean]>=6.0.2",
     "newspaper3k>=0.2.8",
     "pydantic[settings]>=2.12.5",
     "pytest>=9.0.2",
     "pytest-asyncio>=1.3.0",
+    "pytest-cov>=6.0.0",
     "tavily-python>=0.7.21",
     "tortoise-orm[asyncpg]>=0.25.3",
     "uvicorn>=0.40.0",
     "pydantic-settings>=2.12.0",
     "aiofiles>=25.1.0",
+    "pydantic-ai>=1.62.0",
 ]
 
 [dependency-groups]
 dev = [
     "anyio>=4.12.1",
+    "faker>=37.12.0",
+    "ruff>=0.15.2",
 ]
 
 [tool.pytest.ini_options]
 anyio_mode = "auto"
+
+[tool.coverage.run]
+source = ["application", "core", "domain", "infrastructure"]
+branch = true
+
+[tool.coverage.html]
+directory = "htmlcov"
 
 [tool.aerich]
 tortoise_orm = "core.config.config.tortoise_orm"

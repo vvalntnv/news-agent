@@ -160,6 +160,12 @@ async def download_media(urls: list[str]) -> list[dict[str, str]]:
 - Relative app path: `backend/static/media/`
 - Public URL prefix: `/static/media/`
 
+## Persistence
+
+- Raw article text and quotes land in `infrastructure.database.models.RawNewsData`.
+- The `article` table ties the raw record to higher-level metadata and the original URL.
+- Downloaded media assets are tracked in the new `media` table (`article_url`, `media_type`, `local_url`), which lets the pipeline update `local_url` once the muxer produces a file.
+
 ## Notes
 
 - The pipeline normalizes outputs to `.mp4`.

@@ -44,6 +44,25 @@ Preserve the original rules as hard constraints.
 - Tests: `backend/tests/`
 - Documentation: `docs/`
 
+### Database Structure (Semantic)
+- Use semantic modules under `backend/infrastructure/database/`.
+- Models must be grouped by semantic subpackages under
+  `backend/infrastructure/database/models/`.
+  - Example layout: `models/article/model.py`, `models/media/model.py`.
+- Repositories live in `backend/infrastructure/database/repositories/`.
+- Repository implementations should be grouped semantically (for example,
+  `repositories/article/repository.py`), instead of flat files like
+  `repositories/article_repository.py`.
+- Repository methods (`create/get/update/retrieve`) must stay in repository classes,
+  not in helper modules.
+- Repository-scoped mappers should live alongside their repository semantic module
+  (for example, `repositories/article/mappers/`) and contain mapping-only logic.
+- Global reusable database utilities live in `backend/infrastructure/database/helpers/`.
+  Do not place repository-only business flow there.
+- Prefer module-level imports for readability when using helpers/mappers, e.g.
+  `from infrastructure.database.helpers import x_helpers` then
+  `x_helpers.some_function(...)`.
+
 ## Import Root Rule (Critical)
 - Treat `backend/` as the Python import root when running commands.
 - Use imports like `from application...`, `from domain...`, `from core...`.
@@ -74,6 +93,10 @@ Run these from `backend/`.
 - `uv run pytest`
 - `uv run pytest -q`
 
+### Test with Coverage
+- `uv run pytest --cov --cov-report=html` - run tests with coverage and generate HTML report
+- Open `htmlcov/index.html` in browser to examine results
+
 ### Test (single test) - key commands
 - Single file:
   - `uv run pytest tests/test_rss_source.py`
@@ -102,6 +125,8 @@ Run these from `backend/`.
 - Async tests generally use `pytest.mark.anyio` in this repo.
 - Prefer deterministic unit tests; keep network-dependent tests skipped unless needed.
 - For bug fixes, include a regression test that fails before the fix.
+- Reuse shared test helpers from `backend/tests/utils/` before creating local one-off
+  helpers in a test file.
 
 ## Code Style Guidelines
 
@@ -113,6 +138,7 @@ Run these from `backend/`.
 ### Formatting
 - Follow PEP 8 and existing repository formatting style.
 - Keep functions short, clear, and single-purpose.
+- Function names should ALWAYS contain VERBS. Functions DO SOMETHING, they are not an object!
 - Avoid unused imports, commented-out blocks, and stray debug statements.
 
 ### Types
