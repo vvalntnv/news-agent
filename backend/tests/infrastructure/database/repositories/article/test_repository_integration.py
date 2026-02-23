@@ -149,25 +149,25 @@ async def test_update_article_media_local_url_updates_existing_media(
     article_repository: ArticleRepository,
     article_factory: ArticleFactory,
 ) -> None:
-    source_url = article_factory.create_article_source_url()
+    article_url = article_factory.create_article_source_url()
     video_media = article_factory.create_media_payload(
         media_type=MediaType.VIDEO,
         local_url=None,
     )
     await article_repository.create_article(
         article_factory.create_article(
-            article_url=source_url,
+            article_url=article_url,
             media=[video_media],
         )
     )
 
     await article_repository.update_article_media_local_url(
-        source_url,
-        "video",
+        article_url,
+        video_media["source_url"],
         "/static/media/movie.mp4",
     )
 
-    article_row = await ArticleEntry.get(article_url=source_url)
+    article_row = await ArticleEntry.get(article_url=article_url)
     media_row = await ArticleMedia.get(article=article_row, media_type="video")
     assert media_row.local_url == "/static/media/movie.mp4"
 
