@@ -44,7 +44,6 @@ class _FakeClient:
         self._responses = {url: list(sequence) for url, sequence in responses.items()}
 
     def stream(self, method: str, url: str) -> _FakeStream:
-        del method
         try:
             status_code, chunks = self._responses[url].pop(0)
         except KeyError as exc:
