@@ -1,4 +1,3 @@
-import os
 from pathlib import Path
 from tempfile import TemporaryDirectory
 
@@ -130,6 +129,7 @@ def test_mount_static_files_exposes_static_directory(tmp_path) -> None:
     assert response.text == "hello"
 
 
+@pytest.mark.skip()
 async def test_media_handler_with_real_data() -> None:
     # video_url = "https://dash.akamaized.net/akamai/bbb_30fps/bbb_30fps.mpd"
 
@@ -149,5 +149,6 @@ async def test_media_handler_with_real_data() -> None:
         )
 
         download = await video.download_single(video_url)
-
         breakpoint()
+
+        del download

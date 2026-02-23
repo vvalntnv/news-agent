@@ -1,3 +1,4 @@
+from enum import Enum
 from urllib.parse import urlparse
 
 from pydantic import BaseModel, Field, ValidationError
@@ -21,12 +22,26 @@ class Information(BaseModel):
         return hostname
 
 
+class MediaType(str, Enum):
+    IMAGE = "image"
+    VIDEO = "video"
+    AUDIO = "audio"
+
+
+class Media(BaseModel):
+    media_type: MediaType
+    source_url: str
+    local_url: str | None = None
+
+
 class ScrapeInformation(Information):
     scraping_url: str = Field(alias="scrapingUrl")
     article_containers: list[str] = Field(alias="articleContainers")
     titles_containers: list[str] = Field(alias="titlesContainers")
     timestamps_conteiners: list[str] = Field(alias="timestampsConteiners")
+    image_containers: list[str] | None = Field(alias="imageContainers", default=None)
     video_containers: list[str] | None = Field(alias="videoContainers", default=None)
+    audio_containers: list[str] | None = Field(alias="audioContainers", default=None)
     summary_containers: list[str] = Field(alias="summaryContainers")
     main_article_container: str = Field(alias="mainArticleContainer")
     author_container: str = Field(alias="authorContainer")

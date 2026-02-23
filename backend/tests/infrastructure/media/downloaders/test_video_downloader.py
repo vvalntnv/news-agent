@@ -108,7 +108,7 @@ async def test_video_downloader_cleans_up_on_failure(tmp_path: Path) -> None:
     assert not tmp_path.exists()
 
 
-# @pytest.mark.skip()
+@pytest.mark.skip()
 async def test_downloading_real_world_video() -> None:
     video_url = "https://edge125.vbox7.com/sl/iyl2RXibn5lNWR64cs6J9w/1771711200/92/9296ba3367/9296ba3367.mpd"
     with TemporaryDirectory() as tmp_dir:

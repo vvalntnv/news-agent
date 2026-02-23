@@ -35,3 +35,33 @@ class MissingArticleContentError(InternalError):
                 details=details,
             )
         )
+
+
+class MissingAuthorError(InternalError):
+    def __init__(self, scraping_url: str, selector: str) -> None:
+        details = {
+            "scraping_url": scraping_url,
+            "selector": selector,
+        }
+        super().__init__(
+            internal_payload=ErrorPayload(
+                code="missing_author",
+                message="Author could not be extracted from the page.",
+                details=details,
+            )
+        )
+
+
+class NoScraperFoundError(InternalError):
+    def __init__(self, url: str, host: str) -> None:
+        details = {
+            "url": url,
+            "host": host,
+        }
+        super().__init__(
+            internal_payload=ErrorPayload(
+                code="no_scraper_found",
+                message="No relevant scraper found for this news website.",
+                details=details,
+            )
+        )
