@@ -17,6 +17,7 @@ def map_article_entry_to_domain(article_entry: ArticleEntry) -> Article | None:
     media_items = map_media_rows(list(media_rows))
 
     return Article(
+        article_id=article_entry.id,
         title=raw_data.title,
         content=ArticleContent(
             raw_content=raw_data.raw_text,
