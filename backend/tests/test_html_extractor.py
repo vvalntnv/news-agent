@@ -4,6 +4,7 @@ from pathlib import Path
 from unittest.mock import AsyncMock, MagicMock
 from datetime import datetime
 
+from core.errors.article_related import MissingAuthorError
 from domain.news.entities import NewsItem, Article
 from domain.news.value_objects import ArticleContent, MediaType, ScrapeInformation
 from infrastructure.extraction.html_extractor import HtmlExtractor
@@ -356,7 +357,9 @@ class TestHtmlExtractorMocked:
         assert "no available article content" in str(exc_info.value).lower()
 
     async def test_extract_no_author_raises_exception(
-        self, mock_scrape_info, mock_news_item
+        self,
+        mock_scrape_info,
+        mock_news_item,
     ):
         """Test that extraction raises exception when author container not found."""
         # Arrange
@@ -381,7 +384,7 @@ class TestHtmlExtractorMocked:
         with pytest.raises(Exception) as exc_info:
             await extractor.extract(mock_news_item)
 
-        assert "no available article content" in str(exc_info.value).lower()
+        assert exc_info.errisinstance(MissingAuthorError)
 
     async def test_multiple_scrapers_registered(self, mock_news_item):
         """Test that extractor correctly selects scraper based on URL host."""
@@ -469,11 +472,7 @@ class TestHtmlExtractorRealData:
         )
 
         news_items = await bnt_feed.check_for_news()
-        # random_news_data = news_items[0]
-        random_news_data = NewsItem(
-            title="",
-            url="https://bntnews.bg/news/izcheznaliyat-korab-krai-sozopol-otkrito-e-nefteno-petno-v-moreto-predpolaga-se-che-e-potanal-1379969news.html",
-        )
+        random_news_data = news_items[0]
 
         # Arrange
         extractor = HtmlExtractor(registered_scrapers=[bnt_scrape_info])
@@ -481,7 +480,6 @@ class TestHtmlExtractorRealData:
         try:
             # Act
             article = await extractor.extract(random_news_data)
-            breakpoint()
 
             # Assert
             assert isinstance(article, Article)

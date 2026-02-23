@@ -1,3 +1,4 @@
+import pytest
 import logging
 
 from fastapi import FastAPI
@@ -5,6 +6,8 @@ from fastapi.testclient import TestClient
 
 from application.error_handlers import register_error_handlers
 from core.errors import ClientError, ErrorPayload, InternalError
+
+pytestmark = pytest.mark.anyio
 
 
 def _build_app() -> FastAPI:

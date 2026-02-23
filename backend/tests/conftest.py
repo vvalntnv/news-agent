@@ -13,8 +13,6 @@ from core.config import config
 from infrastructure.database.repositories import TortoiseArticleRepository
 from tests.utils.factories import ArticleFactory
 
-pytestmark = pytest.mark.anyio
-
 _IDENTIFIER_PATTERN = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*$")
 
 
@@ -91,7 +89,8 @@ async def _truncate_test_tables() -> None:
 
 
 @pytest.fixture(autouse=True, scope="session")
-async def initialized_test_database() -> AsyncIterator[str]:
+async def initialized_test_database(anyio_backend) -> AsyncIterator[str]:
+    del anyio_backend
     test_db_name = _build_test_db_name()
     test_db_user = _build_test_db_user()
 

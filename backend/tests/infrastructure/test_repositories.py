@@ -8,7 +8,6 @@ import pytest
 from domain.news.entities import Article
 from infrastructure.database.repositories import TortoiseArticleRepository
 
-
 pytestmark = pytest.mark.anyio
 
 
@@ -32,7 +31,7 @@ async def test_create_article_delegates_to_raw_and_media_helpers(
     create_entry = AsyncMock(return_value=article_entry)
     ensure_media = AsyncMock()
 
-    monkeypatch.setattr(repository, "_ensure_raw_news_data", ensure_raw)
+    monkeypatch.setattr(repository, "_create_raw_article_data", ensure_raw)
     monkeypatch.setattr(repository, "_create_article_record", create_entry)
     monkeypatch.setattr(repository, "_ensure_media_for_article", ensure_media)
 
