@@ -121,12 +121,12 @@ async def test_update_article_media_local_url_forwards(monkeypatch: pytest.Monke
 
     await repository.update_article_media_local_url(
         "https://example.com/article",
-        "video",
+        "https://example.com/video.mp4",
         "/tmp/movie.mp4",
     )
 
     updater.assert_awaited_once_with(
         "https://example.com/article",
-        "video",
+        "https://example.com/video.mp4",
         "/tmp/movie.mp4",
     )

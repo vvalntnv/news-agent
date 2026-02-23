@@ -53,10 +53,10 @@ class TortoiseArticleRepository(ArticleRepository):
     async def update_article_media_local_url(
         self,
         article_url: str,
-        media_type: str,
+        source_url: str,
         local_url: str,
     ) -> None:
-        if not article_url:
+        if not article_url or not source_url:
             return
 
         article_entry = await ArticleEntry.filter(article_url=article_url).first()
@@ -65,16 +65,10 @@ class TortoiseArticleRepository(ArticleRepository):
 
         media_row = await ArticleMedia.filter(
             article=article_entry,
-            media_type=media_type,
+            source_url=source_url,
         ).first()
 
         if media_row is None:
-            await ArticleMedia.create(
-                article=article_entry,
-                media_type=media_type,
-                source_url=article_url,
-                local_url=local_url,
-            )
             return
 
         if media_row.local_url == local_url:
