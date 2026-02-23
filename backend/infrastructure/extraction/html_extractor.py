@@ -22,7 +22,7 @@ from infrastructure.extraction.media_extraction_strategies import (
 )
 
 from .media_extraction_strategies.helpers.strategy_execution_plan_helpers import (
-    create_default_comperhansive_media_collection_strategy_execution_plan,
+    create_default_comprehensive_media_collection_strategy_execution_plan,
 )
 
 
@@ -47,7 +47,7 @@ class HtmlExtractor(ContentExtractor):
         }
         self.media_collection_strategy_execution_plan = (
             media_collection_strategy_execution_plan
-            or create_default_comperhansive_media_collection_strategy_execution_plan()
+            or create_default_comprehensive_media_collection_strategy_execution_plan()
         )
         self.client = httpx.AsyncClient(
             headers={

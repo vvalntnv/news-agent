@@ -5,7 +5,7 @@ from fastapi import FastAPI
 from core.config import config
 
 
-# TODO: Create a comperhansive DatabaseManager class
+# TODO: Create a comprehensive DatabaseManager class
 async def init_db():
     await Tortoise.init(config=config.tortoise_orm)
     # Generate schemas for safe startup in development
