@@ -26,7 +26,7 @@ async def test_create_article_persists_raw_article_and_media(
         local_url="/static/media/image.jpg",
     )
     article = article_factory.create_article(
-        source_url=source_url,
+        article_url=source_url,
         quotes=["q1", "q2"],
         media=[video_media, image_media],
     )
@@ -56,7 +56,7 @@ async def test_retrieve_article_returns_full_aggregate(
         local_url=None,
     )
     article = article_factory.create_article(
-        source_url=source_url,
+        article_url=source_url,
         title="stored",
         author="stored-author",
         quotes=["quote-a"],
@@ -83,7 +83,7 @@ async def test_article_exists_changes_after_create(
     assert await article_repository.article_exists(source_url) is False
 
     await article_repository.create_article(
-        article_factory.create_article(source_url=source_url)
+        article_factory.create_article(article_url=source_url)
     )
 
     assert await article_repository.article_exists(source_url) is True
@@ -99,7 +99,7 @@ async def test_update_article_updates_raw_and_media(
         local_url=None,
     )
     initial = article_factory.create_article(
-        source_url=source_url,
+        article_url=source_url,
         title="old-title",
         author="old-author",
         quotes=["old-quote"],
@@ -108,16 +108,17 @@ async def test_update_article_updates_raw_and_media(
     await article_repository.create_article(initial)
 
     updated_video_media = article_factory.create_media_payload(
-        article_url=initial_video_media["article_url"],
+        source_url=initial_video_media["source_url"],
         media_type=MediaType.VIDEO,
         local_url="/static/media/video.mp4",
     )
+
     updated_image_media = article_factory.create_media_payload(
         media_type=MediaType.IMAGE,
         local_url=None,
     )
     updated = article_factory.create_article(
-        source_url=source_url,
+        article_url=source_url,
         title="new-title",
         author="new-author",
         quotes=["new-quote"],
@@ -155,7 +156,7 @@ async def test_update_article_media_local_url_updates_existing_media(
     )
     await article_repository.create_article(
         article_factory.create_article(
-            source_url=source_url,
+            article_url=source_url,
             media=[video_media],
         )
     )

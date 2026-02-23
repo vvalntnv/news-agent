@@ -15,7 +15,7 @@ class ArticleFactory:
     def create_article(
         self,
         *,
-        source_url: str | None = None,
+        article_url: str | None = None,
         title: str | None = None,
         author: str | None = None,
         timestamp: str | None = None,
@@ -23,7 +23,7 @@ class ArticleFactory:
         quotes: list[str] | None = None,
         media: list[dict[str, str | None]] | None = None,
     ) -> Article:
-        generated_source_url = source_url or self.create_article_source_url()
+        generated_source_url = article_url or self.create_article_source_url()
         generated_title = title or self.faker.sentence(nb_words=6)
         generated_author = author or self.faker.name()
         generated_timestamp = timestamp or self.faker.iso8601()
@@ -40,7 +40,7 @@ class ArticleFactory:
             "media": generated_media,
             "timestamp": generated_timestamp,
             "author": generated_author,
-            "source_url": generated_source_url,
+            "article_url": generated_source_url,
         }
         return Article.model_validate(article_payload)
 
@@ -48,13 +48,13 @@ class ArticleFactory:
         self,
         *,
         media_type: MediaType,
-        article_url: str | None = None,
+        source_url: str | None = None,
         local_url: str | None = None,
     ) -> dict[str, str | None]:
-        generated_article_url = article_url or self.faker.url()
+        generated_source_url = source_url or self.faker.url()
         return {
             "media_type": media_type.value,
-            "article_url": generated_article_url,
+            "source_url": generated_source_url,
             "local_url": local_url,
         }
 

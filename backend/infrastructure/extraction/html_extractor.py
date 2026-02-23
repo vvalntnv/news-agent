@@ -22,7 +22,7 @@ from infrastructure.extraction.media_extraction_strategies import (
 )
 
 from infrastructure.extraction.media_extraction_strategies.helpers.strategy_execution_plan_helpers import (
-    create_default_comperhensive_media_collection_strategy_execution_plan,
+    create_default_comprehensive_media_collection_strategy_execution_plan,
 )
 
 
@@ -93,7 +93,7 @@ class HtmlExtractor(ContentExtractor):
                 if timestamp
                 else datetime.now().strftime("%d/%m/%Y, %H:%M:%S")
             ),
-            source_url=item.url,
+            article_url=item.url,
         )
 
     def _extract_article(
@@ -215,7 +215,7 @@ class HtmlExtractor(ContentExtractor):
                 media_items.append(
                     Media(
                         media_type=media_type,
-                        article_url=normalized_url,
+                        source_url=normalized_url,
                         local_url=None,
                     )
                 )

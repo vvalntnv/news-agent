@@ -167,7 +167,7 @@ class TestHtmlExtractorMocked:
         assert any(media.media_type == MediaType.IMAGE for media in article.media)
         assert any(media.media_type == MediaType.AUDIO for media in article.media)
 
-        media_urls = {media.article_url for media in article.media}
+        media_urls = {media.source_url for media in article.media}
         assert "https://example.com/video1.mp4" in media_urls
         assert "https://example.com/video2.mp4" in media_urls
         assert "https://example.com/inline-video.mp4" in media_urls
@@ -179,10 +179,10 @@ class TestHtmlExtractorMocked:
         inline_audio_entries = [
             media
             for media in article.media
-            if media.article_url == "https://example.com/audio-track.mp3"
+            if media.source_url == "https://example.com/audio-track.mp3"
         ]
         assert len(inline_audio_entries) == 1
-        assert article.source_url == "https://example.com/news/article-123"
+        assert article.article_url == "https://example.com/news/article-123"
 
     async def test_extract_success_no_media(
         self, mock_scrape_info, mock_news_item, sample_html_no_videos
@@ -239,14 +239,14 @@ class TestHtmlExtractorMocked:
         matching_audio = [
             media
             for media in article.media
-            if media.article_url == "https://example.com/source-audio.mp3"
+            if media.source_url == "https://example.com/source-audio.mp3"
         ]
 
         assert matching_audio
         assert matching_audio[0].media_type == MediaType.AUDIO
         assert not any(
             media.media_type == MediaType.VIDEO
-            and media.article_url == "https://example.com/source-audio.mp3"
+            and media.source_url == "https://example.com/source-audio.mp3"
             for media in article.media
         )
 
@@ -464,7 +464,6 @@ class TestHtmlExtractorRealData:
 
         return ScrapeInformation(**config_data)
 
-    # @pytest.mark.skip()
     async def test_bnt_site_scraping(self, bnt_scrape_info: ScrapeInformation):
         """Test extraction from real BNT news site."""
         bnt_feed = WebScraperSource(
@@ -486,7 +485,7 @@ class TestHtmlExtractorRealData:
             assert article.title in random_news_data.title
             assert article.content is not None
             assert len(article.content.raw_content) > 0
-            assert article.source_url == random_news_data.url
+            assert article.article_url == random_news_data.url
 
             # Media may or may not be present depending on the article
             assert isinstance(article.media, list)

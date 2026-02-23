@@ -30,7 +30,7 @@ class MediaType(str, Enum):
 
 class Media(BaseModel):
     media_type: MediaType
-    article_url: str
+    source_url: str
     local_url: str | None = None
 
 

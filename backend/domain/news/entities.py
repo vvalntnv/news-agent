@@ -24,4 +24,4 @@ class Article(BaseModel):
     media: list[Media] = Field(default_factory=list)
     timestamp: str
     author: str
-    source_url: str | None = None
+    article_url: str | None = None

@@ -17,7 +17,7 @@ def map_media_rows(media_rows: Iterable[ArticleMedia]) -> list[Media]:
         mapped_media.append(
             Media(
                 media_type=media_type,
-                article_url=media_row.article_url,
+                source_url=media_row.source_url,
                 local_url=media_row.local_url,
             )
         )

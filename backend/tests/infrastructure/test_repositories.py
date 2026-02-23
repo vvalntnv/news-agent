@@ -44,7 +44,7 @@ async def test_create_article_delegates_to_raw_and_media_helpers(
         "media": [
             {
                 "media_type": "video",
-                "article_url": "https://example.com/article",
+                "source_url": "https://example.com/article",
             }
         ],
         "timestamp": "05/02/2026, 10:00:00",
@@ -76,17 +76,18 @@ async def test_retrieve_article_builds_domain_type(monkeypatch: pytest.MonkeyPat
     media_rows = [
         SimpleNamespace(
             media_type="video",
-            article_url="https://example.com/article",
+            source_url="https://example.com/article",
             local_url="/tmp/video.mp4",
         ),
         SimpleNamespace(
             media_type="audio",
-            article_url="https://example.com/article",
+            source_url="https://example.com/article",
             local_url=None,
         ),
     ]
 
     article_entry = SimpleNamespace(
+        id=123,
         raw_data=raw_data,
         article_url="https://example.com/article",
         media_items=media_rows,
@@ -107,7 +108,7 @@ async def test_retrieve_article_builds_domain_type(monkeypatch: pytest.MonkeyPat
     media_values = getattr(loaded_article, "media", [])
     assert len(media_values) == 2
     assert media_values[0].media_type.value == "video"
-    assert media_values[0].article_url == "https://example.com/article"
+    assert media_values[0].source_url == "https://example.com/article"
     assert media_values[1].media_type.value == "audio"
     assert media_values[1].local_url is None
 
@@ -116,7 +117,7 @@ async def test_update_article_media_local_url_forwards(monkeypatch: pytest.Monke
     repository = TortoiseArticleRepository()
 
     updater = AsyncMock()
-    monkeypatch.setattr(repository, "_update_media_local_url", updater)
+    monkeypatch.setattr(repository, "update_article_media_local_url", updater)
 
     await repository.update_article_media_local_url(
         "https://example.com/article",

@@ -40,7 +40,7 @@ class ArticleMedia(models.Model):
         on_delete=fields.CASCADE,
     )
     media_type = fields.CharField(max_length=64)
-    article_url = fields.CharField(max_length=2048)
+    source_url = fields.CharField(max_length=2048)
     local_url = fields.CharField(max_length=2048, null=True)
     created_at = fields.DatetimeField(auto_now_add=True)
 
@@ -50,7 +50,7 @@ class ArticleMedia(models.Model):
 
 class ArticleMediaCreate(BaseModel):
     media_type: str
-    article_url: str
+    source_url: str
     local_url: Optional[str] = None
 
 

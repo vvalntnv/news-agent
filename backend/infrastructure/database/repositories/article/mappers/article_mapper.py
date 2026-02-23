@@ -26,5 +26,5 @@ def map_article_entry_to_domain(article_entry: ArticleEntry) -> Article | None:
         media=media_items,
         timestamp=raw_data.timestamp,
         author=raw_data.author,
-        source_url=article_entry.article_url,
+        article_url=article_entry.article_url,
     )

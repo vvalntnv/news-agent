@@ -54,15 +54,16 @@ async def _ensure_test_database_exists(
     database_name: str,
     owner_role_name: str,
 ) -> None:
+    safe_database_name = _validate_identifier(database_name)
+    safe_owner_role_name = _validate_identifier(owner_role_name)
+
     database_exists = await connection.fetchval(
         "SELECT 1 FROM pg_database WHERE datname = $1",
         database_name,
     )
     if database_exists:
-        return
+        await connection.execute(f"DROP DATABASE {safe_database_name} WITH (FORCE)")
 
-    safe_database_name = _validate_identifier(database_name)
-    safe_owner_role_name = _validate_identifier(owner_role_name)
     await connection.execute(
         f"CREATE DATABASE {safe_database_name} OWNER {safe_owner_role_name}"
     )
