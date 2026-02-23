@@ -398,7 +398,7 @@ class TestHtmlExtractorRealData:
         # random_news_data = news_items[0]
         random_news_data = NewsItem(
             title="",
-            url="https://bntnews.bg/news/izcheznaliyat-korab-krai-sozopol-otkrito-e-nefteno-petno-v-moreto-predpolaga-se-che-e-potanal-1379969news.html",
+            url="https://bntnews.bg/news/sluzhebniyat-finansov-ministar-shte-vnese-do-dni-v-ns-udalzhitelnoto-deistvie-na-byujet-2025-1380596news.html",
         )
 
         # Arrange

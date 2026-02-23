@@ -1,34 +1,30 @@
 from pathlib import Path
 
-from domain.media.protocols import (
-    AudioDownloaderProtocol,
-    VideoDownloaderFactoryProtocol,
-)
+import httpx
+
+from domain.media.protocols import AudioDownloaderProtocol
 from domain.media.supported_media_types import SupportedStreamTypes
 from domain.media.value_objects import DownloadedMedia, MediaDownloadableLink
-from infrastructure.media.downloaders.video_downloader import VideoDownloader
+from infrastructure.media.downloaders.general_downloader import GeneralDownloader
 
 
-class AudioDownloader(AudioDownloaderProtocol):
+class AudioDownloader(GeneralDownloader, AudioDownloaderProtocol):
     def __init__(
         self,
         path_to_download: Path | str,
         chunks_data: list[MediaDownloadableLink],
         source_url: str,
-        video_downloader_factory: VideoDownloaderFactoryProtocol | None = None,
+        stream_type: SupportedStreamTypes = SupportedStreamTypes.DIRECT,
+        client: httpx.AsyncClient | None = None,
     ) -> None:
-        self.path_to_download = path_to_download
-        self.audio_urls = chunks_data
-        self._source_url = source_url
-        self._video_downloader_factory = video_downloader_factory
+        super().__init__(
+            path_to_download=path_to_download,
+            chunks_data=chunks_data,
+            stream_type=stream_type,
+            source_url=source_url,
+            client=client,
+        )
+        self.audio_urls = self.download_urls
 
     async def download_audio(self) -> DownloadedMedia:
-        # TODO: Implement dedicated audio-only downloading logic.
-        factory = self._video_downloader_factory or VideoDownloader
-        delegated_downloader = factory(
-            path_to_download=self.path_to_download,
-            chunks_data=self.audio_urls,
-            stream_type=SupportedStreamTypes.DIRECT,
-            source_url=self._source_url,
-        )
-        return await delegated_downloader.download_video()
+        return await self._download_media()

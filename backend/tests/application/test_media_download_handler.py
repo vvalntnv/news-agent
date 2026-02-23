@@ -130,6 +130,7 @@ def test_mount_static_files_exposes_static_directory(tmp_path) -> None:
     assert response.text == "hello"
 
 
+@pytest.mark.skip(reason="Manual integration test")
 async def test_media_handler_with_real_data() -> None:
     # video_url = "https://dash.akamaized.net/akamai/bbb_30fps/bbb_30fps.mpd"
 
@@ -148,6 +149,4 @@ async def test_media_handler_with_real_data() -> None:
             download_root=downloads_dir, static_media_root=videos_dir
         )
 
-        download = await video.download_single(video_url)
-
-        breakpoint()
+        _download = await video.download_single(video_url)

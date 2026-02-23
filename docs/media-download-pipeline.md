@@ -56,12 +56,16 @@ Located in `backend/infrastructure/media/resolvers/`:
 
 Located in `backend/infrastructure/media/downloaders/`:
 
-- `VideoDownloader`
-  - Downloads resolved links to a local folder.
-  - Preserves ordering via sequence numbers and init segment ordering.
+- `GeneralDownloader`
+  - Shared implementation for chunk/file downloading across media types.
+  - Handles ordered chunk downloads, retries with global soft-halt, and cleanup.
   - Returns `DownloadedMedia`.
 
-  The downloader submits each chunk as a `RetryJob` to the shared
+- `VideoDownloader`
+  - Video specialization over `GeneralDownloader`.
+  - Exposes `download_video()` while reusing shared chunk download logic.
+
+  The shared downloader submits each chunk as a `RetryJob` to the shared
   `AsyncRetryJobPool`, which constrains concurrency and retries. Retryable
   HTTP errors (e.g., 429/503) activate a global soft-halt: new attempts
   wait until the configured pause window expires before running. The pool
@@ -75,8 +79,15 @@ Located in `backend/infrastructure/media/downloaders/`:
   (numeric and HTTP-date) and picks the longest delay among the computed
   backoff, configured fallback, or the header.
 
-`AudioDownloader` and `ImageDownloader` currently reuse the same chunk download
-mechanism.
+- `AudioDownloader`
+  - Audio specialization over `GeneralDownloader`.
+  - Exposes `download_audio()` and supports configurable stream type (defaults
+    to `DIRECT`).
+
+- `ImageDownloader`
+  - Image specialization over `GeneralDownloader`.
+  - Exposes `download_image()` and supports configurable stream type (defaults
+    to `DIRECT`).
 
 ### Muxer
 
