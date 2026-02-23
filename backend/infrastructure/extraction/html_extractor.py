@@ -20,8 +20,9 @@ from domain.news.value_objects import (
 from infrastructure.extraction.media_extraction_strategies import (
     MediaExtractionStrategy,
 )
+
 from infrastructure.extraction.media_extraction_strategies.helpers.strategy_execution_plan_helpers import (
-    create_default_comperhansive_media_collection_strategy_execution_plan,
+    create_default_comperhensive_media_collection_strategy_execution_plan,
 )
 
 
