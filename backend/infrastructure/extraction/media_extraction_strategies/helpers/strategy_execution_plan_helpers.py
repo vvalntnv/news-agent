@@ -25,7 +25,7 @@ def _get_audio_selectors(scrape_information: ScrapeInformation) -> list[str] | N
     return scrape_information.audio_containers
 
 
-def create_default_comperhansive_media_collection_strategy_execution_plan() -> (
+def create_default_comprehensive_media_collection_strategy_execution_plan() -> (
     tuple[MediaExtractionStrategy, ...]
 ):
     return (
