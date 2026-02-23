@@ -1,4 +1,3 @@
-import os
 from pathlib import Path
 from tempfile import TemporaryDirectory
 
@@ -150,5 +149,6 @@ async def test_media_handler_with_real_data() -> None:
         )
 
         download = await video.download_single(video_url)
-
         breakpoint()
+
+        del download
