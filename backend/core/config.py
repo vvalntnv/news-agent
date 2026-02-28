@@ -1,10 +1,71 @@
-from pydantic import Field
-from pydantic_settings import BaseSettings, SettingsConfigDict
-from dotenv import load_dotenv
 from pathlib import Path
 from urllib.parse import quote
 
+from dotenv import load_dotenv
+from pydantic import BaseModel, ConfigDict, Field
+from pydantic_settings import BaseSettings, SettingsConfigDict
+
 load_dotenv()
+
+
+class ProviderSettings(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    enabled: bool = True
+    api_key: str | None = None
+    api_base_url: str | None = None
+    api_version: str | None = None
+    organization: str | None = None
+    timeout_seconds: float = Field(60.0, gt=0.0)
+    max_retries: int = Field(2, ge=0)
+    headers: dict[str, str] = Field(default_factory=dict)
+
+
+class ModelDefinition(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    model_name: str
+    display_name: str | None = None
+    temperature: float = Field(1.0, ge=0.0, le=2.0)
+    top_p: float = Field(1.0, ge=0.0, le=1.0)
+    max_tokens: int = Field(512, ge=1)
+    timeout_seconds: float = Field(60.0, gt=0.0)
+    stop_sequences: list[str] = Field(default_factory=list)
+    metadata: dict[str, str] = Field(default_factory=dict)
+
+
+class ProviderModelsConfig(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    settings: ProviderSettings = ProviderSettings(timeout_seconds=60.0, max_retries=2)
+    default_model: str | None = None
+    models: dict[str, ModelDefinition] = Field(default_factory=dict)
+
+
+class ModelConfigs(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    default_provider: str | None = None
+    providers: dict[str, ProviderModelsConfig] = Field(default_factory=dict)
+
+    def get_provider(self, provider_name: str) -> ProviderModelsConfig | None:
+        return self.providers.get(provider_name)
+
+    def get_model(
+        self,
+        *,
+        provider_name: str,
+        model_alias: str | None = None,
+    ) -> ModelDefinition | None:
+        provider_config = self.get_provider(provider_name)
+        if provider_config is None:
+            return None
+
+        selected_alias = model_alias or provider_config.default_model
+        if selected_alias is None:
+            return None
+
+        return provider_config.models.get(selected_alias)
 
 
 class Config(BaseSettings):
@@ -48,6 +109,8 @@ class Config(BaseSettings):
     db_name: str = "news_agent"
 
     should_remove_downloaded_media: bool = False
+
+    models: ModelConfigs | None = None
 
     @property
     def db_url(self) -> str:
