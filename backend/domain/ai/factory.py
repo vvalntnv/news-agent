@@ -2,6 +2,8 @@ from __future__ import annotations
 
 from typing import Protocol
 
+from pydantic import BaseModel
+
 from domain.ai.protocols import Agent
 from domain.ai.configuration import AIConfiguration
 

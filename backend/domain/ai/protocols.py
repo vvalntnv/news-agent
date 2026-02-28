@@ -7,6 +7,8 @@ from pydantic import BaseModel
 
 from domain.ai.configuration import AIConfiguration
 
+type DependenciesType = BaseModel | str | int | dict
+
 
 @runtime_checkable
 class Tool[T, D](Protocol):
@@ -33,17 +35,19 @@ class Agent[T: BaseModel](Protocol):
     toolsets: list[Toolset]
     tools: list[Tool]
     config: AIConfiguration
+    dependencies: BaseModel | str | int | dict
 
-    async def stream(
+    async def stream_text(
         self,
         prompt: str,
     ) -> AsyncIterable[str]: ...
 
+    async def stream(
+        self,
+        prompt: str,
+    ) -> AsyncIterable[T]: ...
+
     async def respond(
         self,
         prompt: str,
-    ) -> str:
-        """Return a textual response to ``prompt`` using optional sampling hints."""
-        ...
-
-    async def get_structured_response(self, prompt: str) -> T: ...
+    ) -> T: ...
