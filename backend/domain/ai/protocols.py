@@ -28,26 +28,11 @@ class Toolset(Protocol):
 
 
 @runtime_checkable
-class Agent[T: BaseModel](Protocol):
-    """Protocol describing an AI agent that produces textual responses."""
+class Agent[O, D](Protocol):
+    output_type: type[O]
+    dependencies_type: type[D]
 
-    output_model: T
-    toolsets: list[Toolset]
     tools: list[Tool]
-    config: AIConfiguration
-    dependencies: BaseModel | str | int | dict
 
-    async def stream_text(
-        self,
-        prompt: str,
-    ) -> AsyncIterable[str]: ...
-
-    async def stream(
-        self,
-        prompt: str,
-    ) -> AsyncIterable[T]: ...
-
-    async def respond(
-        self,
-        prompt: str,
-    ) -> T: ...
+    async def run(self, context: D) -> O:
+        ...
