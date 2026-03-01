@@ -7,8 +7,6 @@ from pydantic import BaseModel
 
 from domain.ai.configuration import AIConfiguration
 
-type DependenciesType = BaseModel | str | int | dict
-
 
 @runtime_checkable
 class Tool[T, D](Protocol):
@@ -28,11 +26,19 @@ class Toolset(Protocol):
 
 
 @runtime_checkable
-class Agent[O, D](Protocol):
+class Agent[O: (BaseModel, str), D](Protocol):
     output_type: type[O]
     dependencies_type: type[D]
 
     tools: list[Tool]
 
-    async def run(self, context: D) -> O:
-        ...
+    async def run(self, prompt: str) -> O: ...
+    def stream(self, prompt: str) -> AsyncIterable[str]: ...
+
+
+class AIFactory(Protocol):
+
+    def create_agent[O: (BaseModel, str), D](
+        self,
+        config: AIConfiguration[O, D],
+    ) -> Agent[O, D]: ...

@@ -26,10 +26,18 @@ class ModelSettings(BaseModel):
     extra_headers: dict[str, str] = Field(default_factory=dict)
     extra_body: dict[str, object] | None = None
 
+    @classmethod
+    def reasonable_model_settings(cls) -> ModelSettings:
+        return ModelSettings(
+            temperature=1.0,
+            top_p=1.0,
+            max_tokens=512,
+            timeout_seconds=60.0,
+            stop_sequences=[],
+        )
+
 
 class UsageLimits(BaseModel):
-    """Usage caps mirroring the agent-level ``UsageLimits`` on ai.pydantic.dev."""
-
     model_config = ConfigDict(extra="forbid")
 
     request_limit: int | None = Field(50, ge=1)
@@ -40,13 +48,7 @@ class UsageLimits(BaseModel):
     count_tokens_before_request: bool = False
 
 
-class AIConfiguration(BaseModel):
-    """Agent configuration inspired by the Pydantic Agent builder.
-
-    ``ModelSettings`` mirrors the per-model knobs in ``backend/core/config.py``,
-    so those values should only be provided to override the catalog defaults.
-    """
-
+class AIConfiguration[O: (BaseModel, str), D: DependenciesType](BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     model_name: str
@@ -55,7 +57,9 @@ class AIConfiguration(BaseModel):
     agent_name: str | None = None
     instructions: str | Sequence[str] | None = None
     system_prompt: Sequence[str] = Field(default_factory=list)
-    model_settings: ModelSettings = Field(default_factory=lambda: ModelSettings())
+    model_settings: ModelSettings = Field(
+        default_factory=ModelSettings.reasonable_model_settings
+    )
     retries: int = Field(default=1, ge=1)
     output_retries: int | None = None
     end_strategy: Literal["early", "exhaustive"] = "early"
@@ -64,6 +68,6 @@ class AIConfiguration(BaseModel):
     tools: list[Tool] = Field(default_factory=list)
     toolsets: list[Toolset] = Field(default_factory=list)
     tool_timeout_seconds: float | None = None
-    deps: DependenciesType | None = None
-    deps_factory: Callable[[], DependenciesType] | None = None
-    output_type: type[str] | type[BaseModel] = str
+    deps: D | None = None
+    deps_factory: Callable[[], D] | None = None
+    output_type: type[O] = str
