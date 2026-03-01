@@ -29,10 +29,20 @@ class ProjectPydanticAgent[O: (BaseModel, str), D](AgentProtocol[O, D]):
         return self
 
     async def run(self, prompt: str) -> O:
+        self._check_dependencies_ok()
+
         run_result = await self._agent.run(prompt, deps=self.dependencies)
         return run_result.output
 
     async def stream(self, prompt: str) -> AsyncIterable[str]:
+        self._check_dependencies_ok()
+
         async with self._agent.run_stream(prompt, deps=self.dependencies) as streamed:
             async for chunk in streamed.stream_text():
                 yield chunk
+
+    def _check_dependencies_ok(self) -> None:
+        assert hasattr(self, "dependencies"), "This class has no deps"
+
+        if not self.dependencies:
+            raise AssertionError("The dependencies are not set!")
