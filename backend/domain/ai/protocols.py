@@ -1,11 +1,14 @@
 from __future__ import annotations
 
 from collections.abc import Mapping
-from typing import AsyncIterable, Awaitable, Protocol, runtime_checkable
+from typing import AsyncIterable, Awaitable, Callable, Protocol, runtime_checkable
 
 from pydantic import BaseModel
+from pydantic_ai import ModelMessage
 
 from domain.ai.configuration import AIConfiguration
+
+type HistoryTrackerFunc = Callable[[list[ModelMessage]], list[ModelMessage]]
 
 
 @runtime_checkable
@@ -29,6 +32,7 @@ class Toolset(Protocol):
 class Agent[O: (BaseModel, str), D](Protocol):
     output_type: type[O]
     dependencies_type: type[D]
+    history_tracker: HistoryTrackerFunc
 
     tools: list[Tool]
 

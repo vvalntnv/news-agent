@@ -6,14 +6,15 @@ from pydantic_ai import Agent as PydanticAgent, Tool as PydanticTool
 from pydantic_ai.settings import ModelSettings as PydanticModelSettings
 
 from domain.ai.configuration import AIConfiguration, ModelSettings
-from domain.ai.protocols import AIFactory, Agent, Tool, Toolset
+from domain.ai.protocols import AIFactory, Agent, HistoryTrackerFunc, Tool, Toolset
 from core.utils.ai_models import resolve_ai_model_config
 from infrastructure.ai.agent import ProjectPydanticAgent
+from infrastructure.ai.history_processor import BasicHistoryProcessor
 
 
 class PydanticAgentAIFactory(AIFactory):
     def __init__(self) -> None:
-        super().__init__()
+        self.history_processor = BasicHistoryProcessor()
 
     def create_agent[O: (BaseModel, str), D](
         self, config: AIConfiguration[O, D]
@@ -28,6 +29,7 @@ class PydanticAgentAIFactory(AIFactory):
             model_name=model_config.model_definition.model_name,
             tools=tools,
             dependencies_type=dependencies_type,
+            history_processor=self.history_processor,
         )
 
         return cast(
@@ -38,6 +40,7 @@ class PydanticAgentAIFactory(AIFactory):
                 dependencies_type=dependencies_type,
                 tools=config.tools,
                 toolsets=config.toolsets,
+                history_tracker=self.history_processor,
             ),
         )
 
@@ -47,6 +50,7 @@ class PydanticAgentAIFactory(AIFactory):
         model_name: str,
         tools: list[PydanticTool],
         dependencies_type: type[D],
+        history_processor: HistoryTrackerFunc,
     ) -> PydanticAgent[D, O]:
         mapped_model_settings = self._map_model_settings(config.model_settings)
 
@@ -64,6 +68,7 @@ class PydanticAgentAIFactory(AIFactory):
             end_strategy=config.end_strategy,
             metadata=dict(config.metadata),
             tool_timeout=config.tool_timeout_seconds,
+            history_processors=[history_processor],
         )
 
     def _map_model_settings(
