@@ -24,7 +24,7 @@ class _ModeTool(ToolSchemaMixin):
 def test_build_json_schema_from_call_handles_required_and_optional_fields() -> None:
     tool = _MathTool()
 
-    json_schema = tool.json_schema()
+    json_schema = tool.json_schema
 
     assert json_schema["type"] == "object"
     assert json_schema["additionalProperties"] is False
@@ -40,7 +40,7 @@ def test_build_json_schema_from_call_handles_required_and_optional_fields() -> N
 def test_build_json_schema_from_call_supports_enum_and_literal() -> None:
     tool = _ModeTool()
 
-    json_schema = tool.json_schema()
+    json_schema = tool.json_schema
 
     properties = json_schema["properties"]
     assert isinstance(properties, dict)

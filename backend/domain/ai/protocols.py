@@ -1,12 +1,20 @@
 from __future__ import annotations
 
 from collections.abc import Mapping
-from typing import AsyncIterable, Awaitable, Callable, Protocol, runtime_checkable
+from typing import (
+    TYPE_CHECKING,
+    AsyncIterable,
+    Awaitable,
+    Callable,
+    Protocol,
+    runtime_checkable,
+)
 
 from pydantic import BaseModel
 from pydantic_ai import ModelMessage
 
-from domain.ai.configuration import AIConfiguration
+if TYPE_CHECKING:
+    from domain.ai.configuration import AIConfiguration
 
 type HistoryTrackerFunc = Callable[[list[ModelMessage]], list[ModelMessage]]
 
@@ -41,7 +49,6 @@ class Agent[O: (BaseModel, str), D](Protocol):
 
 
 class AIFactory(Protocol):
-
     def create_agent[O: (BaseModel, str), D](
         self,
         config: AIConfiguration[O, D],

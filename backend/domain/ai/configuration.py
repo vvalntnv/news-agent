@@ -49,7 +49,7 @@ class UsageLimits(BaseModel):
 
 
 class AIConfiguration[O: (BaseModel, str), D](BaseModel):
-    model_config = ConfigDict(extra="forbid")
+    model_config = ConfigDict(extra="forbid", arbitrary_types_allowed=True)
 
     model_name: str
     provider_name: str | None = None

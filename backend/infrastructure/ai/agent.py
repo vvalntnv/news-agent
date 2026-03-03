@@ -52,5 +52,5 @@ class ProjectPydanticAgent[O: (BaseModel, str), D](AgentProtocol[O, D]):
     def _check_dependencies_ok(self) -> None:
         assert hasattr(self, "dependencies"), "This class has no deps"
 
-        if not self.dependencies:
+        if self.dependencies is None:
             raise AssertionError("The dependencies are not set!")
