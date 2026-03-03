@@ -1,18 +1,22 @@
 from typing import Self
 
 from pydantic import BaseModel
+
 from application.ai.workflow.step import ConditionFunction, WorkflowStep
 from application.ai.workflow.workflow import Workflow
 from domain.ai.protocols import Agent
 
 
-class WorkflowBuilder:
+class WorkflowBuilder[S: BaseModel, O: (BaseModel, str), D]:
     def __init__(self) -> None:
-        self._has_added_start_step = False
-        self._initial_step: WorkflowStep
+        self._initial_step: WorkflowStep[S, O, D] | None = None
+        self._agent: Agent[O, D] | None = None
 
     @classmethod
-    def initialize(cls, starting_step: WorkflowStep | None = None) -> Self:
+    def initialize(
+        cls,
+        starting_step: WorkflowStep[S, O, D] | None = None,
+    ) -> Self:
         builder = cls()
 
         if starting_step is not None:
@@ -20,59 +24,37 @@ class WorkflowBuilder:
 
         return builder
 
-    def build(self) -> Workflow:
-        if self.is_workflow_empty:
-            # ReviewComment: here we need custom exception
-            raise Exception("You have to first define the entry step")
+    def build(self) -> Workflow[S, O, D]:
+        if self._initial_step is None:
+            raise ValueError("You must define a workflow entry step")
 
-        if not self.has_agent:
-            raise Exception(
-                "The workflow builder does not have an agent to place in workflow!"
-            )
+        if self._agent is None:
+            raise ValueError("You must assign an agent before building a workflow")
 
-        return Workflow(self._initial_step, self.agent)
+        return Workflow(step_graph_entry=self._initial_step, agent=self._agent)
 
-    def add_agent(self, agent: Agent) -> Self:
-        self.agent = agent
-
+    def add_agent(self, agent: Agent[O, D]) -> Self:
+        self._agent = agent
         return self
 
-    def add_starting_step(self, initial_step: WorkflowStep) -> Self:
-        if not self.is_workflow_empty:
-            # ReviewComment: here we need custom exception
-            raise Exception("There is currently an assigned first step")
+    def add_starting_step(self, initial_step: WorkflowStep[S, O, D]) -> Self:
+        if self._initial_step is not None:
+            raise ValueError("The workflow already has a starting step")
 
         self._initial_step = initial_step
         return self
 
     def add_step(
-        self,
-        start: WorkflowStep,
-        end: WorkflowStep,
+        self, start: WorkflowStep[S, O, D], end: WorkflowStep[S, O, D]
     ) -> Self:
-        if self.is_workflow_empty:
-            self.add_starting_step(start)
-
         start.add_direct_transition(end)
-
         return self
 
-    def add_transition[S: BaseModel, O: BaseModel](
+    def add_transition(
         self,
-        premise: WorkflowStep,
+        premise: WorkflowStep[S, O, D],
         condition_func: ConditionFunction[S],
-        consiquence: WorkflowStep[S, O],
+        consequence: WorkflowStep[S, O, D],
     ) -> Self:
-        if self.is_workflow_empty:
-            self.add_starting_step(premise)
-
-        premise.add_transition(condition_func, consiquence)
+        premise.add_transition(condition_func, consequence)
         return self
-
-    @property
-    def is_workflow_empty(self) -> bool:
-        return not hasattr(self, "_initial_step")
-
-    @property
-    def has_agent(self) -> bool:
-        return hasattr(self, "agent")

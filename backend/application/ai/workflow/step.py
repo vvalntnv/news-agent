@@ -1,5 +1,5 @@
 from abc import ABC, abstractmethod
-from typing import Callable
+from collections.abc import Callable
 
 from pydantic import BaseModel
 
@@ -8,42 +8,45 @@ from domain.ai.protocols import Agent
 type ConditionFunction[S: BaseModel] = Callable[[S], bool]
 
 
-class WorkflowStep[S: BaseModel, O: BaseModel](ABC):
+class WorkflowStep[S: BaseModel, O: (BaseModel, str), D](ABC):
     state: S
     has_executed: bool
     result: O
 
     def __init__(self, state: S) -> None:
-        self.transitions: list[tuple[ConditionFunction[S], WorkflowStep]] = []
-        self.direct_step: WorkflowStep | None = None
+        self.transitions: list[tuple[ConditionFunction[S], WorkflowStep[S, O, D]]] = []
+        self.direct_step: WorkflowStep[S, O, D] | None = None
         self.has_executed = False
         self.state = state
-        self._agent: Agent
+        self.agent: Agent[O, D]
 
-    def set_agent(self, agent: Agent) -> None:
+    def set_agent(self, agent: Agent[O, D]) -> None:
         self.agent = agent
 
-    def execute(self) -> O:
+    async def execute(self) -> O:
         if not self.has_agent_assigned:
             raise Exception("No agent is assigned to the current step")
 
-        return self.execution_logic()
+        result = await self.execute_logic()
+        self.has_executed = True
+        self.result = result
+        return result
 
     @abstractmethod
-    def execution_logic(self) -> O:
-        pass
+    async def execute_logic(self) -> O:
+        raise NotImplementedError
 
     @property
     def has_agent_assigned(self) -> bool:
         return hasattr(self, "agent")
 
-    def add_direct_transition(self, next_step: "WorkflowStep") -> None:
+    def add_direct_transition(self, next_step: "WorkflowStep[S, O, D]") -> None:
         self.direct_step = next_step
 
     def add_transition(
         self,
         condition: ConditionFunction[S],
-        next_step: "WorkflowStep",
+        next_step: "WorkflowStep[S, O, D]",
     ) -> None:
         if self.direct_step is not None:
             raise Exception(
@@ -54,12 +57,12 @@ class WorkflowStep[S: BaseModel, O: BaseModel](ABC):
         cause_consequence_pair = (condition, next_step)
         self.transitions.append(cause_consequence_pair)
 
-    def get_next(self) -> "WorkflowStep | None":
+    def get_next(self) -> "WorkflowStep[S, O, D] | None":
         if self.direct_step is not None:
             return self.direct_step
 
-        for determine_switch, step in self.transitions:
-            should_switch = determine_switch(self.state)
+        for get_condition, step in self.transitions:
+            should_switch = get_condition(self.state)
 
             if should_switch:
                 return step
