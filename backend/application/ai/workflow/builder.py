@@ -50,6 +50,9 @@ class WorkflowBuilder:
         start: WorkflowStep,
         end: WorkflowStep,
     ) -> Self:
+        if self.is_workflow_empty:
+            self.add_starting_step(start)
+
         start.add_direct_transition(end)
 
         return self
@@ -60,6 +63,9 @@ class WorkflowBuilder:
         condition_func: ConditionFunction[S],
         consiquence: WorkflowStep[S, O],
     ) -> Self:
+        if self.is_workflow_empty:
+            self.add_starting_step(premise)
+
         premise.add_transition(condition_func, consiquence)
         return self
 

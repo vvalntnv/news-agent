@@ -7,6 +7,7 @@ from typing import (
     Awaitable,
     Callable,
     Protocol,
+    Self,
     runtime_checkable,
 )
 
@@ -44,6 +45,7 @@ class Agent[O: (BaseModel, str), D](Protocol):
 
     tools: list[Tool]
 
+    def add_dependency(self, dependency: D) -> Self: ...
     async def run(self, prompt: str) -> O: ...
     def stream(self, prompt: str) -> AsyncIterable[str]: ...
 

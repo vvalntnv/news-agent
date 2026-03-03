@@ -58,8 +58,8 @@ class WorkflowStep[S: BaseModel, O: BaseModel](ABC):
         if self.direct_step is not None:
             return self.direct_step
 
-        for get_condition, step in self.transitions:
-            should_switch = get_condition(self.state)
+        for determine_switch, step in self.transitions:
+            should_switch = determine_switch(self.state)
 
             if should_switch:
                 return step
