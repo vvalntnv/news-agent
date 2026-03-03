@@ -5,7 +5,7 @@ from typing import Callable, Literal
 
 from pydantic import BaseModel, ConfigDict, Field
 
-from domain.ai.protocols import DependenciesType, Tool, Toolset
+from domain.ai.protocols import Tool, Toolset
 
 
 class ModelSettings(BaseModel):
@@ -48,7 +48,7 @@ class UsageLimits(BaseModel):
     count_tokens_before_request: bool = False
 
 
-class AIConfiguration[O: (BaseModel, str), D: DependenciesType](BaseModel):
+class AIConfiguration[O: (BaseModel, str), D](BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     model_name: str
@@ -70,4 +70,4 @@ class AIConfiguration[O: (BaseModel, str), D: DependenciesType](BaseModel):
     tool_timeout_seconds: float | None = None
     deps: D | None = None
     deps_factory: Callable[[], D] | None = None
-    output_type: type[O] = str
+    output_type: type[O] | type[str] = str
