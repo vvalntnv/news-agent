@@ -20,6 +20,7 @@ All of the backend impotrs should happen as backend as the root directory. NO ba
 - Follow PEP 8 style guidelines.
 - Keep functions small and focused on a single task.
 - When doing complex checks with if, or while or whatever, always use variables to make the check more meaningful. Rather than complex checks like age < 18 and age >= 60, use is_underaged = age < 18 and is_senior = age >=60, for example, and then if is_underaged and not is_seniod: ... That way the checks get super readable.
+- For generics, use the python 3.12+ way of defining generics. e.g. `def some_func[T](input: T) -> Output[T]: ...` or `class SomeClass[T: BaseModel]: ...` and etc.
 
 
 ## 5. Configuration

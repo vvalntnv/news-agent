@@ -119,6 +119,12 @@ class Config(BaseSettings):
     db_port: str = "5432"
     db_name: str = "news_agent"
 
+    output_logs: str | None = None
+    log_level: str = "INFO"
+    log_level_ai: str | None = None
+    log_level_code: str | None = None
+    log_level_http: str | None = None
+
     should_remove_downloaded_media: bool = False
 
     model_configs_file_path: Path = Path("model_config.yaml")
@@ -148,6 +154,21 @@ class Config(BaseSettings):
             f"postgres://{quote(self.db_user)}:{quote(self.db_pass)}"
             f"@{self.db_host}:{self.db_port}/{self.db_name}"
         )
+
+    @property
+    def logs_output_directory(self) -> Path | None:
+        output_logs_value = self.output_logs
+        if output_logs_value is None:
+            return None
+
+        normalized_output_logs = output_logs_value.strip()
+        is_output_logs_empty = normalized_output_logs == ""
+        is_output_logs_terminal = normalized_output_logs.upper() == "TERM"
+
+        if is_output_logs_empty or is_output_logs_terminal:
+            return None
+
+        return Path(normalized_output_logs)
 
     @property
     def tortoise_orm(self) -> dict[str, dict[str, object]]:

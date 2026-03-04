@@ -4,11 +4,18 @@ from typing import Self
 from pydantic import BaseModel
 from pydantic_ai import Agent as PydanticAgent
 
+from core.loggers import get_ai_logger
+
 from domain.ai.protocols import (
     Agent as AgentProtocol,
     HistoryTrackerFunc,
     Tool,
     Toolset,
+)
+from infrastructure.ai.event_logger import (
+    AIEventStreamHandler,
+    build_ai_event_stream_handler,
+    consume_ai_run_events,
 )
 
 
@@ -30,6 +37,10 @@ class ProjectPydanticAgent[O: (BaseModel, str), D](AgentProtocol[O, D]):
         self.tools = tools
         self.toolsets = toolsets
         self.history_tracker = history_tracker
+        self._ai_logger = get_ai_logger()
+        self._ai_event_stream_handler: AIEventStreamHandler[D] = (
+            build_ai_event_stream_handler(logger=self._ai_logger)
+        )
 
     def add_dependency(self, dependency: D) -> Self:
         self.dependencies = dependency
@@ -38,14 +49,17 @@ class ProjectPydanticAgent[O: (BaseModel, str), D](AgentProtocol[O, D]):
     async def run(self, prompt: str) -> O:
         self._check_dependencies_ok()
 
-        # TODO: Maybe here we need to track costs or usages?
-        run_result = await self._agent.run(prompt, deps=self.dependencies)
-        return run_result.output
+        run_events = self._agent.run_stream_events(prompt, deps=self.dependencies)
+        return await consume_ai_run_events(run_events, logger=self._ai_logger)
 
     async def stream(self, prompt: str) -> AsyncIterable[str]:
         self._check_dependencies_ok()
 
-        async with self._agent.run_stream(prompt, deps=self.dependencies) as streamed:
+        async with self._agent.run_stream(
+            prompt,
+            deps=self.dependencies,
+            event_stream_handler=self._ai_event_stream_handler,
+        ) as streamed:
             async for chunk in streamed.stream_text():
                 yield chunk
 

@@ -141,11 +141,19 @@ Runtime methods:
   - Stores dependencies and returns self for fluent usage.
 - `run(prompt: str) -> O`
   - Validates dependencies.
-  - Calls underlying `_agent.run(prompt, deps=self.dependencies)`.
-  - Returns `run_result.output`.
+  - Calls underlying `_agent.run_stream_events(prompt, deps=self.dependencies)`.
+  - Intercepts and logs all pydantic-ai events.
+  - Returns final output from `AgentRunResultEvent.result.output`.
 - `stream(prompt: str) -> AsyncIterable[str]`
   - Validates dependencies.
-  - Uses `_agent.run_stream(...)` and yields `stream_text()` chunks.
+  - Uses `_agent.run_stream(..., event_stream_handler=...)` and yields `stream_text()` chunks.
+  - Event stream handler is always attached and logs streamed events.
+
+AI event logging:
+
+- Uses `infrastructure/ai/event_logger.py` for event interception.
+- Logs event lifecycle (`part_start`, `part_delta`, `part_end`, `tool_call`, `tool_result`, `final_result`, `run_result`).
+- Logger source is `core/loggers` under the `news_agent.ai` logger namespace.
 
 Dependency guard:
 
