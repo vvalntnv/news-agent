@@ -29,7 +29,7 @@ class ModelSettings(BaseModel):
     @classmethod
     def reasonable_model_settings(cls) -> ModelSettings:
         return ModelSettings(
-            temperature=1.0,
+            temperature=0.2,
             top_p=1.0,
             max_tokens=512,
             timeout_seconds=60.0,

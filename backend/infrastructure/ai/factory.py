@@ -112,7 +112,7 @@ class PydanticAgentAIFactory(AIFactory):
     def _map_tools_to_pydantic_tools(self, tools: list[Tool]) -> list[PydanticTool]:
         mapped_tools: list[PydanticTool] = []
         for tool in tools:
-            takes_ctx = tool.ctx is not None
+            takes_ctx = tool.ctx_type is not None
             mapped_tools.append(
                 PydanticTool.from_schema(
                     function=tool.__call__,

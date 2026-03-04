@@ -21,13 +21,14 @@ type HistoryTrackerFunc = Callable[[list[ModelMessage]], list[ModelMessage]]
 
 
 @runtime_checkable
-class Tool[T, D](Protocol):
+class Tool[O, D](Protocol):
     name: str
     description: str
-    json_schema: Mapping[str, object]
-    ctx: D | None
+    ctx_type: type[D] | None
+    __call__: Callable[..., O | Awaitable[O]]
 
-    def __call__(self, **kwargs: object) -> T | Awaitable[T]: ...
+    @property
+    def json_schema(self) -> dict[str, object]: ...
 
 
 @runtime_checkable

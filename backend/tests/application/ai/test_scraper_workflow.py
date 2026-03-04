@@ -1,5 +1,6 @@
 import pytest
 
+from application.ai.tools.browse import BrowseTool
 from application.ai.workflow.predefined.news_site_exploration import (
     NewsSiteExplorationDependencies,
     NewsSiteExplorationInput,
@@ -18,8 +19,8 @@ async def test_running_analyze_workflow() -> None:
     dependencies = NewsSiteExplorationDependencies(scraping_url=scraping_url)
     config = AIConfiguration[ScrapeInformation, NewsSiteExplorationDependencies](
         provider_name="groq",
-        # model_alias="primary",
-        model_name="openai/gpt-oss-120b",
+        model_alias="primary",
+        # model_name="openai/gpt-oss-120b",
         output_type=ScrapeInformation,
         agent_name="news-site-explorer",
         instructions=[
@@ -29,15 +30,16 @@ async def test_running_analyze_workflow() -> None:
             "Return a valid ScrapeInformation object without extra narrative and prefer selectors that survive layout tweaks.",
         ],
         system_prompt=[
-            "Return only the fields declared in ScrapeInformation and explain analysis in concise bullet form if needed."
+            "You will be presented with a feed of news. What you need to do is pick 1 or 2 random articles and analyze its contents in order to fill in the ScrapeInformation.",
+            "Return only the fields declared in ScrapeInformation and explain analysis in concise bullet form if needed.",
         ],
         deps=dependencies,
+        tools=[BrowseTool()],
+        retries=5,
     )
 
     agent = agent_factory.create_agent(config)
     agent.add_dependency(dependencies)
-
-    breakpoint()
 
     input_data = NewsSiteExplorationInput(scraping_url=scraping_url)
     workflow = PredefinedWorkflowRegistry().create_news_site_exploration_workflow(
@@ -45,3 +47,4 @@ async def test_running_analyze_workflow() -> None:
     )
 
     result = await workflow.execute_workflow()
+    breakpoint()

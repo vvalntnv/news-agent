@@ -5,14 +5,13 @@ from collections.abc import Mapping
 from enum import Enum
 from types import NoneType
 from types import UnionType
-from typing import Literal, Union, get_args, get_origin, get_type_hints
+from typing import Callable, Literal, Union, get_args, get_origin, get_type_hints
 
 
-class ToolSchemaMixin:
+class ToolSchemaMixin[O]:
     """Build JSON schema definitions from a tool ``__call__`` signature."""
 
-    def __call__(self, **kwargs: object) -> object:
-        raise NotImplementedError
+    __call__: Callable[..., O]
 
     @property
     def json_schema(self) -> dict[str, object]:
@@ -23,7 +22,7 @@ class ToolSchemaMixin:
         required: list[str] = []
 
         for parameter_name, parameter in signature.parameters.items():
-            if parameter_name in {"self", "cls"}:
+            if parameter_name in {"self", "cls", "ctx"}:
                 continue
 
             is_variadic_parameter = parameter.kind in {

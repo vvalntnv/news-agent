@@ -1,11 +1,13 @@
 from __future__ import annotations
 
+from collections.abc import AsyncIterator
 from dataclasses import dataclass
 from types import SimpleNamespace
 from typing import Callable, cast
-from unittest.mock import AsyncMock
+from unittest.mock import MagicMock
 
 import pytest
+from pydantic_ai import AgentRunResult, AgentRunResultEvent
 
 from core.config import ModelDefinition, ProviderSettings
 from core.utils.ai_models import ResolvedModelConfig
@@ -63,6 +65,22 @@ class _FakeToolset:
         self.tools = tools
         self.name = "test-toolset"
         self.description = "toolset description"
+
+
+class _ResultEventsIterator:
+    def __init__(self, output: str) -> None:
+        self._event = AgentRunResultEvent(AgentRunResult(output))
+        self._yielded = False
+
+    def __aiter__(self) -> AsyncIterator[AgentRunResultEvent[str]]:
+        return self
+
+    async def __anext__(self) -> AgentRunResultEvent[str]:
+        if self._yielded:
+            raise StopAsyncIteration
+
+        self._yielded = True
+        return self._event
 
 
 def _build_configuration(
@@ -256,6 +274,7 @@ def test_construct_pydantic_agent_passes_history_processor_list(
 
     created_agent = factory._construct_pydantic_agent(
         config=config,
+        provider_name="openai",
         model_name="openai:gpt-5.1-mini",
         tools=[],
         dependencies_type=_DependencyContainer,
@@ -282,8 +301,13 @@ async def test_factory_built_agent_can_run_with_dependencies_and_mocked_output(
         lambda _: _build_resolved_model_config(),
     )
 
-    run_mock = AsyncMock(return_value=SimpleNamespace(output="mocked-output"))
-    mocked_pydantic_agent = SimpleNamespace(run=run_mock, run_stream=None)
+    run_stream_events_mock = MagicMock(
+        return_value=_ResultEventsIterator(output="mocked-output")
+    )
+    mocked_pydantic_agent = SimpleNamespace(
+        run_stream_events=run_stream_events_mock,
+        run_stream=None,
+    )
 
     monkeypatch.setattr(
         factory,
@@ -299,7 +323,7 @@ async def test_factory_built_agent_can_run_with_dependencies_and_mocked_output(
     result = await built_agent.run("execute")
 
     assert result == "mocked-output"
-    run_mock.assert_awaited_once_with("execute", deps=dependency_container)
+    run_stream_events_mock.assert_called_once_with("execute", deps=dependency_container)
 
 
 async def test_factory_built_agent_runs_tool_when_mocked_model_requests_it(
@@ -325,12 +349,14 @@ async def test_factory_built_agent_runs_tool_when_mocked_model_requests_it(
 
     monkeypatch.setattr(factory_module.PydanticTool, "from_schema", _fake_from_schema)
 
-    captured_run_mock: dict[str, AsyncMock] = {}
+    captured_run_events_mock: dict[str, MagicMock] = {}
 
     def _fake_construct_pydantic_agent(**kwargs: object) -> object:
         mapped_tools = cast(list[dict[str, object]], kwargs["tools"])
 
-        async def _mocked_model_run(prompt: str, deps: _DependencyContainer) -> object:
+        def _mocked_model_run_events(
+            prompt: str, deps: _DependencyContainer
+        ) -> _ResultEventsIterator:
             del prompt
             requested_tool_name = "echo_tool"
             selected_tool = next(
@@ -343,11 +369,15 @@ async def test_factory_built_agent_runs_tool_when_mocked_model_requests_it(
                 selected_tool["function"],
             )
             tool_result = selected_function(text="from-model")
-            return SimpleNamespace(output=f"{tool_result}|tenant={deps.tenant_id}")
+            return _ResultEventsIterator(
+                output=f"{tool_result}|tenant={deps.tenant_id}"
+            )
 
-        run_mock = AsyncMock(side_effect=_mocked_model_run)
-        captured_run_mock["run"] = run_mock
-        return SimpleNamespace(run=run_mock, run_stream=None)
+        run_stream_events_mock = MagicMock(side_effect=_mocked_model_run_events)
+        captured_run_events_mock["run_stream_events"] = run_stream_events_mock
+        return SimpleNamespace(
+            run_stream_events=run_stream_events_mock, run_stream=None
+        )
 
     monkeypatch.setattr(
         factory, "_construct_pydantic_agent", _fake_construct_pydantic_agent
@@ -363,7 +393,7 @@ async def test_factory_built_agent_runs_tool_when_mocked_model_requests_it(
 
     assert result == "tool-echo:from-model|tenant=tenant-tools"
     assert recording_tool.calls == ["from-model"]
-    captured_run_mock["run"].assert_awaited_once_with(
+    captured_run_events_mock["run_stream_events"].assert_called_once_with(
         "please use your tool",
         deps=dependency_container,
     )

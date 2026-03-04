@@ -21,6 +21,12 @@ class _ModeTool(ToolSchemaMixin):
         return f"{mode}:{detail}"
 
 
+class _CtxAwareTool(ToolSchemaMixin):
+    def __call__(self, ctx: object, query: str, limit: int = 3) -> str:
+        del ctx
+        return f"{query}:{limit}"
+
+
 def test_build_json_schema_from_call_handles_required_and_optional_fields() -> None:
     tool = _MathTool()
 
@@ -46,3 +52,16 @@ def test_build_json_schema_from_call_supports_enum_and_literal() -> None:
     assert isinstance(properties, dict)
     assert properties["mode"] == {"type": "string", "enum": ["fast", "safe"]}
     assert properties["detail"] == {"type": "string", "enum": ["short", "long"]}
+
+
+def test_build_json_schema_from_call_ignores_ctx_parameter() -> None:
+    tool = _CtxAwareTool()
+
+    json_schema = tool.json_schema
+
+    properties = json_schema["properties"]
+    assert isinstance(properties, dict)
+    assert "ctx" not in properties
+    assert properties["query"] == {"type": "string"}
+    assert properties["limit"] == {"type": "integer"}
+    assert json_schema["required"] == ["query"]
