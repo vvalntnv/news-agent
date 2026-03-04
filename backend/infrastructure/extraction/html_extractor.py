@@ -20,6 +20,7 @@ from domain.news.value_objects import (
 from infrastructure.extraction.media_extraction_strategies import (
     MediaExtractionStrategy,
 )
+from infrastructure.extraction.html_sanitizer import HtmlSanitizer
 
 from infrastructure.extraction.media_extraction_strategies.helpers.strategy_execution_plan_helpers import (
     create_default_comprehensive_media_collection_strategy_execution_plan,
@@ -35,6 +36,7 @@ class HtmlExtractor(ContentExtractor):
         self,
         registered_scrapers: list[ScrapeInformation],
         attrs_to_retain: tuple[str, ...] | list[str] = ("href",),
+        html_sanitizer: HtmlSanitizer | None = None,
         media_collection_strategy_execution_plan: (
             tuple[MediaExtractionStrategy, ...] | None
         ) = None,
@@ -42,9 +44,9 @@ class HtmlExtractor(ContentExtractor):
         self.scraping_informations: dict[Host, ScrapeInformation] = {
             info.get_host(): info for info in registered_scrapers
         }
-        self.attrs_to_retain: set[str] = {
-            attribute.lower() for attribute in attrs_to_retain
-        }
+        self.html_sanitizer = html_sanitizer or HtmlSanitizer(
+            attrs_to_retain=attrs_to_retain
+        )
         self.media_collection_strategy_execution_plan = (
             media_collection_strategy_execution_plan
             or create_default_comprehensive_media_collection_strategy_execution_plan()
@@ -120,47 +122,26 @@ class HtmlExtractor(ContentExtractor):
                 selector=relevant_scraping_info.main_article_container,
             )
 
-        self._strip_irrelevant_tags(
-            container_root,
-            self._gather_media_selectors(relevant_scraping_info),
+        sanitized_content = self.html_sanitizer.sanitize_html(
+            str(container_root),
+            selectors_to_remove=self._gather_media_selectors(relevant_scraping_info),
         )
-        quotes = self._extract_quotes(container_root)
-        self._retain_allowed_attributes(container_root)
+
+        sanitized_soup = BeautifulSoup(sanitized_content, "html.parser")
+        sanitized_root = sanitized_soup.find()
+
+        if sanitized_root is None:
+            raise MissingArticleContentError(
+                scraping_url=relevant_scraping_info.scraping_url,
+                selector=relevant_scraping_info.main_article_container,
+            )
+
+        quotes = self._extract_quotes(sanitized_root)
 
         return ArticleContent(
-            raw_content=str(container_root),
+            raw_content=str(sanitized_root),
             quotes=quotes,
         )
-
-    def _strip_irrelevant_tags(
-        self,
-        article_container: Tag,
-        selectors: list[str] | None,
-    ) -> None:
-        irrelevant_tags = (
-            "audio",
-            "canvas",
-            "embed",
-            "iframe",
-            "noscript",
-            "object",
-            "script",
-            "source",
-            "style",
-            "svg",
-            "template",
-            "track",
-            "video",
-        )
-
-        for tag_name in irrelevant_tags:
-            for tag in article_container.find_all(tag_name):
-                tag.decompose()
-
-        if selectors:
-            for selector in selectors:
-                for tag in article_container.select(selector):
-                    tag.decompose()
 
     def _extract_quotes(self, article_container: Tag) -> list[str]:
         found_quotes: set[str] = set()
@@ -173,15 +154,6 @@ class HtmlExtractor(ContentExtractor):
                     found_quotes.add(quote_text)
 
         return list(found_quotes)
-
-    def _retain_allowed_attributes(self, article_container: Tag) -> None:
-        tags_to_process = [article_container, *article_container.find_all(True)]
-        for tag in tags_to_process:
-            retained_attributes: dict[str, str | list[str]] = {}
-            for attribute_name, attribute_value in tag.attrs.items():
-                if attribute_name.lower() in self.attrs_to_retain:
-                    retained_attributes[attribute_name] = attribute_value
-            tag.attrs = retained_attributes  # type: ignore[assignment]
 
     def _gather_media_selectors(
         self, relevant_scraping_info: ScrapeInformation
