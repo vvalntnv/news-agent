@@ -3,10 +3,8 @@ from pydantic import BaseModel, Field
 from application.ai.workflow.builder import WorkflowBuilder
 from application.ai.workflow.step import WorkflowStep
 from application.ai.workflow.workflow import Workflow
-from domain.ai.configuration import AIConfiguration
-from domain.ai.protocols import AIFactory
+from domain.ai.protocols import Agent
 from domain.news.value_objects import ScrapeInformation
-from infrastructure.ai.factory import PydanticAgentAIFactory
 
 
 class NewsSiteExplorationInput(BaseModel):
@@ -45,29 +43,6 @@ def _build_exploration_prompt(
         lines.append(f"Additional guidance: {input_data.extra_guidance}")
 
     return "\n".join(lines)
-
-
-def _build_agent_configuration(
-    input_data: NewsSiteExplorationInput,
-) -> AIConfiguration[ScrapeInformation, NewsSiteExplorationDependencies]:
-    dependencies = NewsSiteExplorationDependencies(scraping_url=input_data.scraping_url)
-
-    return AIConfiguration[ScrapeInformation, NewsSiteExplorationDependencies](
-        model_name="openai/gpt-5.1-mini",
-        output_type=ScrapeInformation,
-        deps=dependencies,
-        retries=2,
-        output_retries=2,
-        instructions=(
-            "You are an expert website structure analyst. "
-            "Find article, title, timestamp, summary, media, and author selectors."
-        ),
-        system_prompt=[
-            "Return schema-valid extraction output only.",
-            "Prefer CSS selectors that generalize across article cards.",
-            "Do not invent selectors that are not visible in the page structure.",
-        ],
-    )
 
 
 def _is_valid_scrape_information(result: ScrapeInformation) -> bool:
@@ -149,21 +124,14 @@ class ValidateNewsSiteSelectorsStep(
 
 
 def build_news_site_exploration_workflow(
-    input_data: NewsSiteExplorationInput,
     *,
-    ai_factory: AIFactory | None = None,
+    input_data: NewsSiteExplorationInput,
+    agent: Agent[ScrapeInformation, NewsSiteExplorationDependencies],
 ) -> Workflow[
     NewsSiteExplorationState,
     ScrapeInformation,
     NewsSiteExplorationDependencies,
 ]:
-    resolved_factory = ai_factory or PydanticAgentAIFactory()
-    configuration = _build_agent_configuration(input_data)
-    agent = resolved_factory.create_agent(configuration)
-
-    dependencies = NewsSiteExplorationDependencies(scraping_url=input_data.scraping_url)
-    configured_agent = agent.add_dependency(dependencies)
-
     state = NewsSiteExplorationState(
         scraping_url=input_data.scraping_url,
         max_attempts=input_data.max_attempts,
@@ -178,7 +146,7 @@ def build_news_site_exploration_workflow(
             NewsSiteExplorationDependencies,
         ]
         .initialize(exploration_step)
-        .add_agent(configured_agent)
+        .add_agent(agent)
         .add_step(exploration_step, validation_step)
         .add_transition(validation_step, _should_retry_exploration, exploration_step)
         .build()

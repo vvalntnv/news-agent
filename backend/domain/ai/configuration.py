@@ -51,7 +51,7 @@ class UsageLimits(BaseModel):
 class AIConfiguration[O: (BaseModel, str), D](BaseModel):
     model_config = ConfigDict(extra="forbid", arbitrary_types_allowed=True)
 
-    model_name: str
+    model_name: str | None = None
     provider_name: str | None = None
     model_alias: str | None = None
     agent_name: str | None = None
@@ -70,4 +70,4 @@ class AIConfiguration[O: (BaseModel, str), D](BaseModel):
     tool_timeout_seconds: float | None = None
     deps: D | None = None
     deps_factory: Callable[[], D] | None = None
-    output_type: type[O] | type[str] = str
+    output_type: type[O]

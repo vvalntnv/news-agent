@@ -19,6 +19,7 @@ class Workflow[S: BaseModel, O: (BaseModel, str), D]:
         final_result: O | None = None
         current_step: WorkflowStep[S, O, D] | None = self.entrypoint
 
+        breakpoint()
         while current_step is not None:
             if not current_step.has_agent_assigned:
                 current_step.set_agent(self.agent)

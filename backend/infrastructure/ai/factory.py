@@ -26,6 +26,7 @@ class PydanticAgentAIFactory(AIFactory):
 
         pydantic_agent = self._construct_pydantic_agent(
             config=config,
+            provider_name=model_config.provider_name,
             model_name=model_config.model_definition.model_name,
             tools=tools,
             dependencies_type=dependencies_type,
@@ -47,15 +48,18 @@ class PydanticAgentAIFactory(AIFactory):
     def _construct_pydantic_agent[O: (BaseModel, str), D](
         self,
         config: AIConfiguration[O, D],
+        provider_name: str,
         model_name: str,
         tools: list[PydanticTool],
         dependencies_type: type[D],
         history_processor: HistoryTrackerFunc,
     ) -> PydanticAgent[D, O]:
         mapped_model_settings = self._map_model_settings(config.model_settings)
+        provider_name = provider_name.strip()
+        model_name = model_name.strip()
 
         return PydanticAgent(
-            model=model_name,
+            model=f"{provider_name}:{model_name}",
             output_type=config.output_type,
             instructions=config.instructions,
             system_prompt=tuple(config.system_prompt),

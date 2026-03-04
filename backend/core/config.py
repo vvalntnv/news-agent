@@ -5,6 +5,8 @@ from dotenv import load_dotenv
 from pydantic import BaseModel, ConfigDict, Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
+from core.configuration_lodaer import ModelConfigurationLoader
+
 load_dotenv()
 
 
@@ -55,17 +57,26 @@ class ModelConfigs(BaseModel):
         self,
         *,
         provider_name: str,
-        model_alias: str | None = None,
+        model_name_or_alias: str | None = None,
     ) -> ModelDefinition | None:
         provider_config = self.get_provider(provider_name)
         if provider_config is None:
             return None
 
-        selected_alias = model_alias or provider_config.default_model
+        selected_alias = model_name_or_alias or provider_config.default_model
         if selected_alias is None:
             return None
 
-        return provider_config.models.get(selected_alias)
+        model_conf = provider_config.models.get(selected_alias)
+
+        if model_conf is not None:
+            return model_conf
+
+        for model_conf in provider_config.models.values():
+            if model_conf.model_name == model_name_or_alias:
+                return model_conf
+
+        return None
 
 
 class Config(BaseSettings):
@@ -110,7 +121,26 @@ class Config(BaseSettings):
 
     should_remove_downloaded_media: bool = False
 
+    model_configs_file_path: Path = Path("model_config.yaml")
+
     models: ModelConfigs | None = None
+
+    def model_post_init(self, __context: object) -> None:
+        _ = __context
+
+        has_models_in_settings = self.models is not None
+        if has_models_in_settings:
+            return
+
+        model_configuration_loader = ModelConfigurationLoader(
+            file_path=self.model_configs_file_path
+        )
+        loaded_configuration = model_configuration_loader.load()
+
+        if loaded_configuration is None:
+            return
+
+        self.models = ModelConfigs.model_validate(loaded_configuration)
 
     @property
     def db_url(self) -> str:

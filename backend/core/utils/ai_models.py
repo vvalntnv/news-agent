@@ -20,12 +20,14 @@ class ResolvedModelConfig:
     model_alias: str
 
 
-def resolve_ai_model_config(config: AIConfiguration) -> ResolvedModelConfig:
+def resolve_ai_model_config(agent_config: AIConfiguration) -> ResolvedModelConfig:
     models_config = global_conf.models
     if models_config is None:
         raise RuntimeError("AI provider catalog is not configured")
 
-    provider_name, model_alias = _resolve_provider_and_alias(config, models_config)
+    provider_name, model_alias = _resolve_provider_and_alias(
+        agent_config, models_config
+    )
 
     provider_config = models_config.get_provider(provider_name)
     if provider_config is None:
@@ -33,7 +35,9 @@ def resolve_ai_model_config(config: AIConfiguration) -> ResolvedModelConfig:
 
     model_definition = models_config.get_model(
         provider_name=provider_name,
-        model_alias=model_alias,
+        model_name_or_alias=model_alias
+        or agent_config.model_alias
+        or agent_config.model_name,
     )
 
     if model_definition is None:
@@ -50,41 +54,32 @@ def resolve_ai_model_config(config: AIConfiguration) -> ResolvedModelConfig:
         provider_name=provider_name,
         provider_settings=provider_config.settings,
         model_definition=model_definition,
+        # FIX: This naming can cause confusion
         model_alias=resolved_alias,
     )
 
 
 def _resolve_provider_and_alias(
-    config: AIConfiguration, models_config: ModelConfigs
+    agent_config: AIConfiguration, models_config: ModelConfigs
 ) -> Tuple[str, str | None]:
-    provider_candidate = config.provider_name
-    alias_candidate = config.model_alias
-    raw_model_name = config.model_name.strip()
+    provider_candidate = models_config.default_provider or agent_config.provider_name
+    alias_candidate = agent_config.model_alias
+    raw_model_name = agent_config.model_name
 
-    if not raw_model_name:
+    if not raw_model_name and provider_candidate is None:
         raise RuntimeError("AI configuration must include a non-empty model_name")
 
     provider_from_model: str | None = None
-    alias_from_model: str | None = None
 
-    if "/" in raw_model_name:
-        raw_provider, raw_alias = raw_model_name.split("/", maxsplit=1)
+    if raw_model_name and "/" in raw_model_name:
+        raw_provider, raw_alias = raw_model_name.strip().split("/", maxsplit=1)
         raw_provider = raw_provider.strip()
         raw_alias = raw_alias.strip()
 
         if raw_provider:
             provider_from_model = raw_provider
 
-        if raw_alias:
-            alias_from_model = raw_alias
-    else:
-        alias_from_model = raw_model_name
-
     provider_name = provider_candidate or provider_from_model
-    alias_candidate = alias_candidate or alias_from_model
-    alias_candidate = alias_candidate or None
-
-    provider_name = provider_name or models_config.default_provider
 
     if provider_name is None:
         raise RuntimeError("unable to resolve AI provider name")
