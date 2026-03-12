@@ -9,6 +9,8 @@ from application.ai.workflow.registry import PredefinedWorkflowRegistry
 from domain.ai.configuration import AIConfiguration
 from domain.news.value_objects import ScrapeInformation
 from infrastructure.ai.factory import PydanticAgentAIFactory
+from infrastructure.extraction.html_extractor import HtmlExtractor
+from infrastructure.sources.web_scraper_source import WebScraperSource
 
 pytestmark = pytest.mark.anyio
 
@@ -46,5 +48,13 @@ async def test_running_analyze_workflow() -> None:
         input_data, agent=agent
     )
 
-    result = await workflow.execute_workflow()
+    result = await workflow.execute_workflow()  # noqa: F841
+
+    assert isinstance(result, ScrapeInformation)
+
+    feed = WebScraperSource("", [result])
+    news = await feed.check_for_news()
+    scraper = HtmlExtractor(registered_scrapers=[result])
+
+    article = await scraper.extract(news[0])
     breakpoint()

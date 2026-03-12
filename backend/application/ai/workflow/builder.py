@@ -33,7 +33,11 @@ class WorkflowBuilder[S: BaseModel, O: (BaseModel, str), D]:
 
         return Workflow(step_graph_entry=self._initial_step, agent=self._agent)
 
-    def add_agent(self, agent: Agent[O, D]) -> Self:
+    def add_default_agent(self, agent: Agent[O, D]) -> Self:
+        """
+        Adds a default agent. If a step does not have an assigned agent to itself, the
+        default agent will be applied to that particular step
+        """
         self._agent = agent
         return self
 

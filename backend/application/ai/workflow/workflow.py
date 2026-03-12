@@ -24,6 +24,8 @@ class Workflow[S: BaseModel, O: (BaseModel, str), D]:
                 current_step.set_agent(self.agent)
 
             result = await current_step.execute()
+            print("Current step: ", current_step)
+            # ReviewComment: maybe here we want to somehow check if a transition condition has happened, because what if it does not?
             final_result = result
             current_step = current_step.get_next()
 

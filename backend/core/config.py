@@ -121,7 +121,7 @@ class Config(BaseSettings):
 
     output_logs: str | None = None
     log_level: str = "INFO"
-    log_level_ai: str | None = None
+    log_level_ai: str | None = "CRITICAL"
     log_level_code: str | None = None
     log_level_http: str | None = None
 

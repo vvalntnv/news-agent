@@ -13,8 +13,13 @@ class ToolSchemaMixin[O]:
 
     __call__: Callable[..., O]
 
+    _cached_schema: dict[str, object] | None = None
+
     @property
     def json_schema(self) -> dict[str, object]:
+        if self._cached_schema:
+            return self._cached_schema
+
         signature = inspect.signature(self.__call__)
         type_hints = get_type_hints(self.__call__)
 
