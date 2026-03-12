@@ -45,7 +45,9 @@ class WorkflowBuilder[S: BaseModel, O: (BaseModel, str), D]:
         return self
 
     def add_step(
-        self, start: WorkflowStep[S, O, D], end: WorkflowStep[S, O, D]
+        self,
+        start: WorkflowStep[S, O, D],
+        end: WorkflowStep[S, O, D],
     ) -> Self:
         start.add_direct_transition(end)
         return self

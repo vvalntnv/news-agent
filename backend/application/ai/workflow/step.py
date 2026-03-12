@@ -1,5 +1,7 @@
 from abc import ABC, abstractmethod
 from collections.abc import Callable
+import inspect
+from typing import Awaitable
 
 from pydantic import BaseModel
 
@@ -27,13 +29,14 @@ class WorkflowStep[S: BaseModel, O: (BaseModel, str), D](ABC):
         if not self.has_agent_assigned:
             raise Exception("No agent is assigned to the current step")
 
-        result = await self.execute_logic()
+        result_coro = self.execute_logic()
+        result = await result_coro if inspect.isawaitable(result_coro) else result_coro
         self.has_executed = True
         self.result = result
         return result
 
     @abstractmethod
-    async def execute_logic(self) -> O:
+    def execute_logic(self) -> O | Awaitable[O]:
         raise NotImplementedError
 
     @property
