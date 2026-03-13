@@ -1,9 +1,7 @@
 from domain.news.entities import Article
 from domain.news.value_objects import ArticleContent
 from infrastructure.database.models.article.model import Article as ArticleEntry
-from infrastructure.database.repositories.article.mappers.media_mapper import (
-    map_media_rows,
-)
+from infrastructure.database.models.article.mappers.media_mapper import map_media_rows
 
 
 def map_article_entry_to_domain(article_entry: ArticleEntry) -> Article | None:
