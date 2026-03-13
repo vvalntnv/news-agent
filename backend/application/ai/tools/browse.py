@@ -39,17 +39,19 @@ class BrowseTool(ToolSchemaMixin, Tool):
             site_url=site_url,
             fallback_url=ctx.deps.scraping_url,
         )
-        response = await self.client.get(target_url)
-        response.raise_for_status()
 
-        page_html = response.text
-        if not sanitize:
-            return page_html
+        async with self.client as client:
+            response = await client.get(target_url)
+            response.raise_for_status()
 
-        return self.sanitizer.sanitize_html(
-            page_html,
-            root_of_analysis=root_of_analysis,
-        )
+            page_html = response.text
+            if not sanitize:
+                return page_html
+
+            return self.sanitizer.sanitize_html(
+                page_html,
+                root_of_analysis=root_of_analysis,
+            )
 
     def _resolve_site_url(self, *, site_url: str | None, fallback_url: str) -> str:
         if site_url is None:
