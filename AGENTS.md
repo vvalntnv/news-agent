@@ -53,19 +53,28 @@ Preserve the original rules as hard constraints.
 - Models must be grouped by semantic subpackages under
   `backend/infrastructure/database/models/`.
   - Example layout: `models/article/model.py`, `models/media/model.py`.
-- Repositories live in `backend/infrastructure/database/repositories/`.
-- Repository implementations should be grouped semantically (for example,
-  `repositories/article/repository.py`), instead of flat files like
-  `repositories/article_repository.py`.
+- Repository implementations must be colocated with model semantic modules,
+  for example `models/article/repository.py`.
+- Do not keep or add repository implementations under
+  `backend/infrastructure/database/repositories/`.
 - Repository methods (`create/get/update/retrieve`) must stay in repository classes,
   not in helper modules.
 - Repository-scoped mappers should live alongside their repository semantic module
-  (for example, `repositories/article/mappers/`) and contain mapping-only logic.
+  (for example, `models/article/mappers/`) and contain mapping-only logic.
 - Global reusable database utilities live in `backend/infrastructure/database/helpers/`.
   Do not place repository-only business flow there.
 - Prefer module-level imports for readability when using helpers/mappers, e.g.
   `from infrastructure.database.helpers import x_helpers` then
   `x_helpers.some_function(...)`.
+
+### Domain-Driven Repository Contracts (Critical)
+- Do not place cross-domain generic repository contracts under a bounded context
+  module such as `domain/news/...`.
+- Put shared contracts in `backend/domain/common/repositories/`.
+- Put bounded-context repository protocols in
+  `backend/domain/<context>/repositories/protocols.py`.
+- Put repository filter/update/create Pydantic models in
+  `backend/domain/<context>/repository_models/`, not in protocol modules.
 
 ## Import Root Rule (Critical)
 - Treat `backend/` as the Python import root when running commands.
