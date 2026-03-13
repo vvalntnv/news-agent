@@ -62,7 +62,7 @@ def resolve_ai_model_config(agent_config: AIConfiguration) -> ResolvedModelConfi
 def _resolve_provider_and_alias(
     agent_config: AIConfiguration, models_config: ModelConfigs
 ) -> Tuple[str, str | None]:
-    provider_candidate = models_config.default_provider or agent_config.provider_name
+    provider_candidate = agent_config.provider_name or models_config.default_provider
     alias_candidate = agent_config.model_alias
     raw_model_name = agent_config.model_name
 
