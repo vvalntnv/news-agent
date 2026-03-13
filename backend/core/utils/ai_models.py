@@ -72,9 +72,8 @@ def _resolve_provider_and_alias(
     provider_from_model: str | None = None
 
     if raw_model_name and "/" in raw_model_name:
-        raw_provider, raw_alias = raw_model_name.strip().split("/", maxsplit=1)
+        raw_provider, _ = raw_model_name.strip().split("/", maxsplit=1)
         raw_provider = raw_provider.strip()
-        raw_alias = raw_alias.strip()
 
         if raw_provider:
             provider_from_model = raw_provider
