@@ -71,13 +71,7 @@ class HtmlExtractor(ContentExtractor):
 
         # TODO: Decide if we REALLY want to traverse time containers (for now no)
         timestamp = soup.select_one(relevant_scraping_info.timestamps_conteiners[0])
-        author_container = soup.select_one(relevant_scraping_info.author_container)
-
-        if author_container is None:
-            raise MissingAuthorError(
-                scraping_url=relevant_scraping_info.scraping_url,
-                selector=relevant_scraping_info.author_container,
-            )
+        author = self._extract_author(soup, relevant_scraping_info)
 
         media_items = self._extract_media(
             soup,
@@ -89,7 +83,7 @@ class HtmlExtractor(ContentExtractor):
             title=item.title,
             content=article_content,
             media=media_items,
-            author=author_container.get_text(),
+            author=author,
             timestamp=(
                 timestamp.get_text()
                 if timestamp
@@ -141,6 +135,24 @@ class HtmlExtractor(ContentExtractor):
         return ArticleContent(
             raw_content=str(sanitized_root),
             quotes=quotes,
+        )
+
+    def _extract_author(
+        self,
+        soup: BeautifulSoup,
+        relevant_scraping_info: ScrapeInformation,
+    ) -> str:
+        author_containers = soup.select(relevant_scraping_info.author_container)
+
+        for author_container in author_containers:
+            author_text = author_container.get_text(" ", strip=True)
+
+            if author_text:
+                return author_text
+
+        raise MissingAuthorError(
+            scraping_url=relevant_scraping_info.scraping_url,
+            selector=relevant_scraping_info.author_container,
         )
 
     def _extract_quotes(self, article_container: Tag) -> list[str]:
