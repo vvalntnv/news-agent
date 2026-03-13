@@ -6,5 +6,4 @@ class BasicHistoryProcessor:
         pass
 
     def __call__(self, messages: list[ModelMessage]) -> list[ModelMessage]:
-        print("Ima neshto")
         return messages
