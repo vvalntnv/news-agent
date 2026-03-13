@@ -15,10 +15,12 @@ from infrastructure.sources.web_scraper_source import WebScraperSource
 pytestmark = pytest.mark.anyio
 
 
+@pytest.mark.slow
 async def test_running_analyze_workflow() -> None:
     agent_factory = PydanticAgentAIFactory()
     scraping_url = "https://bntnews.bg/"
     dependencies = NewsSiteExplorationDependencies(scraping_url=scraping_url)
+    browse_tool, client = BrowseTool.build_with_client()
     config = AIConfiguration[ScrapeInformation, NewsSiteExplorationDependencies](
         provider_name="groq",
         model_alias="primary",
@@ -36,7 +38,7 @@ async def test_running_analyze_workflow() -> None:
             "Return only the fields declared in ScrapeInformation and explain analysis in concise bullet form if needed.",
         ],
         deps=dependencies,
-        tools=[BrowseTool()],
+        tools=[browse_tool],
         retries=5,
     )
 
@@ -48,13 +50,28 @@ async def test_running_analyze_workflow() -> None:
         input_data, agent=agent
     )
 
-    result = await workflow.execute_workflow()  # noqa: F841
+    async with client:
+        result = await workflow.execute_workflow()
 
     assert isinstance(result, ScrapeInformation)
 
     feed = WebScraperSource("", [result])
-    news = await feed.check_for_news()
-    scraper = HtmlExtractor(registered_scrapers=[result])
+    try:
+        news = await feed.check_for_news()
+    finally:
+        await feed.close()
 
-    article = await scraper.extract(news[0])
-    breakpoint()
+    assert news, "expected at least one news item to be discovered"
+
+    scraper = HtmlExtractor(registered_scrapers=[result])
+    try:
+        article = await scraper.extract(news[0])
+    finally:
+        await scraper.client.aclose()
+
+    assert article.title == news[0].title
+    assert article.article_url == news[0].url
+    assert article.content.raw_content.strip()
+    assert isinstance(article.content.quotes, list)
+    assert article.author.strip()
+    assert article.timestamp

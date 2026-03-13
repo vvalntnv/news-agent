@@ -15,6 +15,9 @@ All of the backend impotrs should happen as backend as the root directory. NO ba
 - **Mandatory Tests**: Every new feature, agent, or utility must have accompanying tests.
 - **Test Location**: Tests should be located in a `tests/` directory, mirroring the structure of the source code.
 - **Framework**: Use `pytest` for all testing needs.
+- **SLOW tests**: You don't have to run all the tests. Some tests are slow and are not worth running, except for when testing the whole code in a PR review. You can sckip slow tests using: 
+    - Without slow tests: cd backend && uv run pytest -m "not slow"
+    - All tests (including slow): cd backend && uv run pytest
 
 ## 4. Code Quality
 - Follow PEP 8 style guidelines.

@@ -34,6 +34,9 @@ dev = [
 
 [tool.pytest.ini_options]
 anyio_mode = "auto"
+markers = [
+    "slow: marks tests that run slowly or require external services",
+]
 
 [tool.coverage.run]
 source = ["application", "core", "domain", "infrastructure"]
