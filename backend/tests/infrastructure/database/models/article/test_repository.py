@@ -6,22 +6,18 @@ from unittest.mock import AsyncMock
 import pytest
 
 from domain.news.entities import Article
-from infrastructure.database.repositories import TortoiseArticleRepository
+from domain.news.repository_models.article import (
+    ArticleRepositoryFilters,
+    ArticleRepositoryUpdatePayload,
+)
+from infrastructure.database.models.article.repository import TortoiseArticleRepository
 
 pytestmark = pytest.mark.anyio
 
 
-class _FakeQuery:
-    def __init__(self, result: object) -> None:
-        self._result = result
-
-    async def first(self) -> object:
-        return self._result
-
-
-async def test_create_article_delegates_to_raw_and_media_helpers(
+async def test_create_delegates_to_raw_and_media_helpers(
     monkeypatch: pytest.MonkeyPatch,
-):
+) -> None:
     repository = TortoiseArticleRepository()
 
     raw_data = SimpleNamespace()
@@ -54,7 +50,7 @@ async def test_create_article_delegates_to_raw_and_media_helpers(
 
     article = Article.model_validate(article_payload)
 
-    saved_article = await repository.create_article(article)
+    saved_article = await repository.create(article)
 
     assert saved_article == article
     ensure_raw.assert_awaited_once_with(article)
@@ -62,7 +58,7 @@ async def test_create_article_delegates_to_raw_and_media_helpers(
     ensure_media.assert_awaited_once_with(article, article_entry)
 
 
-async def test_retrieve_article_builds_domain_type(monkeypatch: pytest.MonkeyPatch):
+async def test_get_by_url_builds_domain_type(monkeypatch: pytest.MonkeyPatch) -> None:
     repository = TortoiseArticleRepository()
 
     raw_data = SimpleNamespace(
@@ -94,9 +90,9 @@ async def test_retrieve_article_builds_domain_type(monkeypatch: pytest.MonkeyPat
     )
 
     get_article = AsyncMock(return_value=article_entry)
-    monkeypatch.setattr(repository, "_get_article_by_url", get_article)
+    monkeypatch.setattr(repository, "_get_article_entry_by_filters", get_article)
 
-    loaded_article = await repository.retrieve_article("https://example.com/article")
+    loaded_article = await repository.get_by_url("https://example.com/article")
 
     assert loaded_article is not None
     assert (
@@ -113,13 +109,13 @@ async def test_retrieve_article_builds_domain_type(monkeypatch: pytest.MonkeyPat
     assert media_values[1].local_url is None
 
 
-async def test_update_article_media_local_url_forwards(monkeypatch: pytest.MonkeyPatch):
+async def test_update_media_local_url_forwards(monkeypatch: pytest.MonkeyPatch) -> None:
     repository = TortoiseArticleRepository()
 
     updater = AsyncMock()
-    monkeypatch.setattr(repository, "update_article_media_local_url", updater)
+    monkeypatch.setattr(repository, "update_media_local_url", updater)
 
-    await repository.update_article_media_local_url(
+    await repository.update_media_local_url(
         "https://example.com/article",
         "https://example.com/video.mp4",
         "/tmp/movie.mp4",
@@ -130,3 +126,39 @@ async def test_update_article_media_local_url_forwards(monkeypatch: pytest.Monke
         "https://example.com/video.mp4",
         "/tmp/movie.mp4",
     )
+
+
+async def test_get_delegates_with_filters(monkeypatch: pytest.MonkeyPatch) -> None:
+    repository = TortoiseArticleRepository()
+
+    get_article = AsyncMock(return_value=None)
+    monkeypatch.setattr(repository, "_get_article_entry_by_filters", get_article)
+
+    filters = ArticleRepositoryFilters(article_url="https://example.com/article")
+    loaded_article = await repository.get(filters)
+
+    assert loaded_article is None
+    get_article.assert_awaited_once_with(filters)
+
+
+async def test_update_many_returns_updated_count(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    repository = TortoiseArticleRepository()
+
+    article_entry_a = SimpleNamespace(raw_data=SimpleNamespace())
+    article_entry_b = SimpleNamespace(raw_data=SimpleNamespace())
+    get_entries = AsyncMock(return_value=[article_entry_a, article_entry_b])
+    apply_updates = AsyncMock()
+
+    monkeypatch.setattr(repository, "_get_article_entries_by_filters", get_entries)
+    monkeypatch.setattr(repository, "_apply_article_updates", apply_updates)
+
+    filters = ArticleRepositoryFilters()
+    payload = ArticleRepositoryUpdatePayload(title="updated-title")
+
+    updated_count = await repository.update_many(filters, payload)
+
+    assert updated_count == 2
+    get_entries.assert_awaited_once_with(filters)
+    assert apply_updates.await_count == 2

@@ -2,8 +2,12 @@ from __future__ import annotations
 
 import pytest
 
-from domain.news.value_objects import MediaType
-from domain.news.protocols import ArticleRepository
+from domain.news.repository_models.article import (
+    ArticleRepositoryFilters,
+    ArticleRepositoryUpdatePayload,
+)
+from domain.news.repositories.protocols import ArticleRepositoryProtocol
+from domain.news.value_objects import Media, MediaType
 from infrastructure.database.models.article.model import Article as ArticleEntry
 from infrastructure.database.models.media.model import ArticleMedia
 from infrastructure.database.models.raw_news_data.model import RawNewsData
@@ -13,7 +17,7 @@ pytestmark = pytest.mark.anyio
 
 
 async def test_create_article_persists_raw_article_and_media(
-    article_repository: ArticleRepository,
+    article_repository: ArticleRepositoryProtocol,
     article_factory: ArticleFactory,
 ) -> None:
     source_url = article_factory.create_article_source_url()
@@ -31,7 +35,7 @@ async def test_create_article_persists_raw_article_and_media(
         media=[video_media, image_media],
     )
 
-    await article_repository.create_article(article)
+    await article_repository.create(article)
 
     raw_row = await RawNewsData.get(url=source_url)
     article_row = await ArticleEntry.get(article_url=source_url)
@@ -47,7 +51,7 @@ async def test_create_article_persists_raw_article_and_media(
 
 
 async def test_retrieve_article_returns_full_aggregate(
-    article_repository: ArticleRepository,
+    article_repository: ArticleRepositoryProtocol,
     article_factory: ArticleFactory,
 ) -> None:
     source_url = article_factory.create_article_source_url()
@@ -62,9 +66,9 @@ async def test_retrieve_article_returns_full_aggregate(
         quotes=["quote-a"],
         media=[audio_media],
     )
-    await article_repository.create_article(article)
+    await article_repository.create(article)
 
-    retrieved = await article_repository.retrieve_article(source_url)
+    retrieved = await article_repository.get_by_url(source_url)
 
     assert retrieved is not None
     assert retrieved.title == "stored"
@@ -75,22 +79,22 @@ async def test_retrieve_article_returns_full_aggregate(
 
 
 async def test_article_exists_changes_after_create(
-    article_repository: ArticleRepository,
+    article_repository: ArticleRepositoryProtocol,
     article_factory: ArticleFactory,
 ) -> None:
     source_url = article_factory.create_article_source_url()
 
-    assert await article_repository.article_exists(source_url) is False
+    assert await article_repository.exists_by_url(source_url) is False
 
-    await article_repository.create_article(
+    await article_repository.create(
         article_factory.create_article(article_url=source_url)
     )
 
-    assert await article_repository.article_exists(source_url) is True
+    assert await article_repository.exists_by_url(source_url) is True
 
 
 async def test_update_article_updates_raw_and_media(
-    article_repository: ArticleRepository,
+    article_repository: ArticleRepositoryProtocol,
     article_factory: ArticleFactory,
 ) -> None:
     source_url = article_factory.create_article_source_url()
@@ -105,7 +109,7 @@ async def test_update_article_updates_raw_and_media(
         quotes=["old-quote"],
         media=[initial_video_media],
     )
-    await article_repository.create_article(initial)
+    await article_repository.create(initial)
 
     updated_video_media = article_factory.create_media_payload(
         source_url=initial_video_media["source_url"],
@@ -117,16 +121,22 @@ async def test_update_article_updates_raw_and_media(
         media_type=MediaType.IMAGE,
         local_url=None,
     )
-    updated = article_factory.create_article(
-        article_url=source_url,
+    update_payload = ArticleRepositoryUpdatePayload(
         title="new-title",
         author="new-author",
         quotes=["new-quote"],
-        media=[updated_video_media, updated_image_media],
+        media=[
+            Media.model_validate(updated_video_media),
+            Media.model_validate(updated_image_media),
+        ],
     )
 
-    await article_repository.update_article(updated)
+    updated = await article_repository.update_one(
+        ArticleRepositoryFilters(article_url=source_url),
+        update_payload,
+    )
 
+    assert updated is not None
     raw_row = await RawNewsData.get(url=source_url)
     article_row = await ArticleEntry.get(article_url=source_url)
     video_row = await ArticleMedia.get(
@@ -146,7 +156,7 @@ async def test_update_article_updates_raw_and_media(
 
 
 async def test_update_article_media_local_url_updates_existing_media(
-    article_repository: ArticleRepository,
+    article_repository: ArticleRepositoryProtocol,
     article_factory: ArticleFactory,
 ) -> None:
     article_url = article_factory.create_article_source_url()
@@ -154,16 +164,16 @@ async def test_update_article_media_local_url_updates_existing_media(
         media_type=MediaType.VIDEO,
         local_url=None,
     )
-    await article_repository.create_article(
+    await article_repository.create(
         article_factory.create_article(
             article_url=article_url,
             media=[video_media],
         )
     )
 
-    await article_repository.update_article_media_local_url(
+    await article_repository.update_media_local_url(
         article_url,
-        video_media["source_url"],
+        str(video_media["source_url"]),
         "/static/media/movie.mp4",
     )
 
@@ -173,7 +183,48 @@ async def test_update_article_media_local_url_updates_existing_media(
 
 
 async def test_retrieve_article_returns_none_for_unknown_url(
-    article_repository: ArticleRepository,
+    article_repository: ArticleRepositoryProtocol,
 ) -> None:
-    retrieved = await article_repository.retrieve_article("https://example.com/unknown")
+    retrieved = await article_repository.get_by_url("https://example.com/unknown")
     assert retrieved is None
+
+
+async def test_create_many_and_get_many_round_trip(
+    article_repository: ArticleRepositoryProtocol,
+    article_factory: ArticleFactory,
+) -> None:
+    first_article = article_factory.create_article()
+    second_article = article_factory.create_article()
+
+    created_articles = await article_repository.create_many(
+        [first_article, second_article]
+    )
+
+    assert len(created_articles) == 2
+
+    loaded_articles = await article_repository.get_many(
+        ArticleRepositoryFilters(),
+        order_by=("id",),
+    )
+
+    assert len(loaded_articles) >= 2
+
+
+async def test_update_many_updates_multiple_articles(
+    article_repository: ArticleRepositoryProtocol,
+    article_factory: ArticleFactory,
+) -> None:
+    first_article = article_factory.create_article(author="old-author")
+    second_article = article_factory.create_article(author="old-author")
+    await article_repository.create_many([first_article, second_article])
+
+    updated_count = await article_repository.update_many(
+        ArticleRepositoryFilters(),
+        ArticleRepositoryUpdatePayload(author="new-author"),
+    )
+
+    assert updated_count >= 2
+
+    loaded_articles = await article_repository.get_many(ArticleRepositoryFilters())
+    assert len(loaded_articles) >= 2
+    assert all(article.author == "new-author" for article in loaded_articles)
