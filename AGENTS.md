@@ -15,11 +15,15 @@ All of the backend impotrs should happen as backend as the root directory. NO ba
 - **Mandatory Tests**: Every new feature, agent, or utility must have accompanying tests.
 - **Test Location**: Tests should be located in a `tests/` directory, mirroring the structure of the source code.
 - **Framework**: Use `pytest` for all testing needs.
+- **SLOW tests**: You don't have to run all the tests. Some tests are slow and are not worth running, except for when testing the whole code in a PR review. You can sckip slow tests using: 
+    - Without slow tests: cd backend && uv run pytest -m "not slow"
+    - All tests (including slow): cd backend && uv run pytest
 
 ## 4. Code Quality
 - Follow PEP 8 style guidelines.
 - Keep functions small and focused on a single task.
 - When doing complex checks with if, or while or whatever, always use variables to make the check more meaningful. Rather than complex checks like age < 18 and age >= 60, use is_underaged = age < 18 and is_senior = age >=60, for example, and then if is_underaged and not is_seniod: ... That way the checks get super readable.
+- For generics, use the python 3.12+ way of defining generics. e.g. `def some_func[T](input: T) -> Output[T]: ...` or `class SomeClass[T: BaseModel]: ...` and etc.
 
 
 ## 5. Configuration

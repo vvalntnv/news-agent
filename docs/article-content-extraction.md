@@ -47,6 +47,9 @@ Defined in `backend/domain/news/entities.py`.
 
 Implemented in `backend/infrastructure/extraction/html_extractor.py`.
 
+Sanitization is shared through `backend/infrastructure/extraction/html_sanitizer.py`
+so tools and extractors can use the same rules.
+
 1. Select `mainArticleContainer` via `ScrapeInformation.main_article_container`.
 2. Clone the selected article container and sanitize it.
 3. Remove irrelevant nodes:
@@ -59,6 +62,18 @@ Implemented in `backend/infrastructure/extraction/html_extractor.py`.
 4. Extract quotes from `<blockquote>` and `<q>` tags.
 5. Strip all HTML attributes except those in `attrs_to_retain`.
 6. Return `ArticleContent(raw_content, quotes)`.
+
+## Shared Sanitizer
+
+`HtmlSanitizer.sanitize_html(...)` supports selecting a root before sanitizing:
+
+- `root_of_analysis="head"`
+- `root_of_analysis="body"`
+- `root_of_analysis="article"`
+- `root_of_analysis=None` (sanitize full document)
+
+When a root is requested but not found, the sanitizer falls back to the full
+document.
 
 ## Media Extraction
 

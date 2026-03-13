@@ -1,10 +1,82 @@
-from pydantic import Field
-from pydantic_settings import BaseSettings, SettingsConfigDict
-from dotenv import load_dotenv
 from pathlib import Path
 from urllib.parse import quote
 
+from dotenv import load_dotenv
+from pydantic import BaseModel, ConfigDict, Field
+from pydantic_settings import BaseSettings, SettingsConfigDict
+
+from core.configuration_lodaer import ModelConfigurationLoader
+
 load_dotenv()
+
+
+class ProviderSettings(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    enabled: bool = True
+    api_key: str | None = None
+    api_base_url: str | None = None
+    api_version: str | None = None
+    organization: str | None = None
+    timeout_seconds: float = Field(60.0, gt=0.0)
+    max_retries: int = Field(2, ge=0)
+    headers: dict[str, str] = Field(default_factory=dict)
+
+
+class ModelDefinition(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    model_name: str
+    display_name: str | None = None
+    temperature: float = Field(1.0, ge=0.0, le=2.0)
+    top_p: float = Field(1.0, ge=0.0, le=1.0)
+    max_tokens: int = Field(512, ge=1)
+    timeout_seconds: float = Field(60.0, gt=0.0)
+    stop_sequences: list[str] = Field(default_factory=list)
+    metadata: dict[str, str] = Field(default_factory=dict)
+
+
+class ProviderModelsConfig(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    settings: ProviderSettings = ProviderSettings(timeout_seconds=60.0, max_retries=2)
+    default_model: str | None = None
+    models: dict[str, ModelDefinition] = Field(default_factory=dict)
+
+
+class ModelConfigs(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    default_provider: str | None = None
+    providers: dict[str, ProviderModelsConfig] = Field(default_factory=dict)
+
+    def get_provider(self, provider_name: str) -> ProviderModelsConfig | None:
+        return self.providers.get(provider_name)
+
+    def get_model(
+        self,
+        *,
+        provider_name: str,
+        model_name_or_alias: str | None = None,
+    ) -> ModelDefinition | None:
+        provider_config = self.get_provider(provider_name)
+        if provider_config is None:
+            return None
+
+        selected_alias = model_name_or_alias or provider_config.default_model
+        if selected_alias is None:
+            return None
+
+        model_conf = provider_config.models.get(selected_alias)
+
+        if model_conf is not None:
+            return model_conf
+
+        for model_conf in provider_config.models.values():
+            if model_conf.model_name == model_name_or_alias:
+                return model_conf
+
+        return None
 
 
 class Config(BaseSettings):
@@ -47,7 +119,34 @@ class Config(BaseSettings):
     db_port: str = "5432"
     db_name: str = "news_agent"
 
+    output_logs: str | None = None
+    log_level: str = "INFO"
+    log_level_ai: str | None = "CRITICAL"
+    log_level_code: str | None = None
+    log_level_http: str | None = None
+
     should_remove_downloaded_media: bool = False
+
+    model_configs_file_path: Path = Path("model_config.yaml")
+
+    models: ModelConfigs | None = None
+
+    def model_post_init(self, __context: object) -> None:
+        _ = __context
+
+        has_models_in_settings = self.models is not None
+        if has_models_in_settings:
+            return
+
+        model_configuration_loader = ModelConfigurationLoader(
+            file_path=self.model_configs_file_path
+        )
+        loaded_configuration = model_configuration_loader.load()
+
+        if loaded_configuration is None:
+            return
+
+        self.models = ModelConfigs.model_validate(loaded_configuration)
 
     @property
     def db_url(self) -> str:
@@ -55,6 +154,21 @@ class Config(BaseSettings):
             f"postgres://{quote(self.db_user)}:{quote(self.db_pass)}"
             f"@{self.db_host}:{self.db_port}/{self.db_name}"
         )
+
+    @property
+    def logs_output_directory(self) -> Path | None:
+        output_logs_value = self.output_logs
+        if output_logs_value is None:
+            return None
+
+        normalized_output_logs = output_logs_value.strip()
+        is_output_logs_empty = normalized_output_logs == ""
+        is_output_logs_terminal = normalized_output_logs.upper() == "TERM"
+
+        if is_output_logs_empty or is_output_logs_terminal:
+            return None
+
+        return Path(normalized_output_logs)
 
     @property
     def tortoise_orm(self) -> dict[str, dict[str, object]]:

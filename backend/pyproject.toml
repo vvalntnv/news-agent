@@ -22,17 +22,22 @@ dependencies = [
     "pydantic-settings>=2.12.0",
     "aiofiles>=25.1.0",
     "pydantic-ai>=1.62.0",
+    "pyyaml>=6.0.2",
 ]
 
 [dependency-groups]
 dev = [
     "anyio>=4.12.1",
     "faker>=37.12.0",
+    "mypy>=1.19.1",
     "ruff>=0.15.2",
 ]
 
 [tool.pytest.ini_options]
 anyio_mode = "auto"
+markers = [
+    "slow: marks tests that run slowly or require external services",
+]
 
 [tool.coverage.run]
 source = ["application", "core", "domain", "infrastructure"]
