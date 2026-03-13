@@ -25,11 +25,11 @@ def _build_tool_context(
 
 
 async def test_browse_tool_returns_raw_html_when_sanitize_is_false() -> None:
-    tool = BrowseTool()
+    tool, client = BrowseTool.build_with_client()
     mock_response = MagicMock()
     mock_response.text = "<html><body><script>keep raw</script></body></html>"
     mock_response.raise_for_status = MagicMock()
-    tool.client.get = AsyncMock(return_value=mock_response)
+    client.get = AsyncMock(return_value=mock_response)
 
     output = await tool(
         _build_tool_context("https://deps.example"),
@@ -38,12 +38,12 @@ async def test_browse_tool_returns_raw_html_when_sanitize_is_false() -> None:
     )
 
     assert "<script>keep raw</script>" in output
-    tool.client.get.assert_awaited_once_with("https://site.example")
-    await tool.client.aclose()
+    client.get.assert_awaited_once_with("https://site.example")
+    await client.aclose()
 
 
 async def test_browse_tool_sanitizes_html_with_configured_root() -> None:
-    tool = BrowseTool()
+    tool, client = BrowseTool.build_with_client()
     mock_response = MagicMock()
     mock_response.text = """
     <html>
@@ -54,7 +54,7 @@ async def test_browse_tool_sanitizes_html_with_configured_root() -> None:
     </html>
     """
     mock_response.raise_for_status = MagicMock()
-    tool.client.get = AsyncMock(return_value=mock_response)
+    client.get = AsyncMock(return_value=mock_response)
 
     output = await tool(
         _build_tool_context("https://deps.example"),
@@ -68,15 +68,15 @@ async def test_browse_tool_sanitizes_html_with_configured_root() -> None:
     assert 'href="/story"' in output
     assert "rel=" not in output
     assert "class=" not in output
-    await tool.client.aclose()
+    await client.aclose()
 
 
 async def test_browse_tool_uses_context_url_when_site_url_missing() -> None:
-    tool = BrowseTool()
+    tool, client = BrowseTool.build_with_client()
     mock_response = MagicMock()
     mock_response.text = "<html><body><p>content</p></body></html>"
     mock_response.raise_for_status = MagicMock()
-    tool.client.get = AsyncMock(return_value=mock_response)
+    client.get = AsyncMock(return_value=mock_response)
 
     output = await tool(
         _build_tool_context("https://from-deps.example"),
@@ -84,5 +84,5 @@ async def test_browse_tool_uses_context_url_when_site_url_missing() -> None:
     )
 
     assert "content" in output
-    tool.client.get.assert_awaited_once_with("https://from-deps.example")
-    await tool.client.aclose()
+    client.get.assert_awaited_once_with("https://from-deps.example")
+    await client.aclose()

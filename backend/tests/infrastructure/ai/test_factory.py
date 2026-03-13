@@ -26,16 +26,20 @@ class _DependencyContainer:
 
 
 class _FakeTool:
-    def __init__(self, *, name: str, ctx: object | None) -> None:
+    def __init__(self, *, name: str, ctx_type: type[object] | None) -> None:
         self.name = name
         self.description = f"description for {name}"
-        self.json_schema = {
+        self.ctx_type = ctx_type
+        self._json_schema = {
             "type": "object",
             "properties": {},
             "additionalProperties": False,
             "required": [],
         }
-        self.ctx = ctx
+
+    @property
+    def json_schema(self) -> dict[str, object]:
+        return dict(self._json_schema)
 
     def __call__(self, **kwargs: object) -> str:
         del kwargs
@@ -43,10 +47,10 @@ class _FakeTool:
 
 
 class _RecordingTool(_FakeTool):
-    def __init__(self, *, name: str, ctx: object | None) -> None:
-        super().__init__(name=name, ctx=ctx)
+    def __init__(self, *, name: str, ctx_type: type[object] | None) -> None:
+        super().__init__(name=name, ctx_type=ctx_type)
         self.calls: list[str] = []
-        self.json_schema = {
+        self._json_schema = {
             "type": "object",
             "properties": {"text": {"type": "string"}},
             "additionalProperties": False,
@@ -128,8 +132,8 @@ def test_create_agent_returns_project_agent_with_protocol_fields(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     factory = PydanticAgentAIFactory()
-    base_tool = _FakeTool(name="base", ctx=None)
-    toolset_tool = _FakeTool(name="toolset-tool", ctx=object())
+    base_tool = _FakeTool(name="base", ctx_type=None)
+    toolset_tool = _FakeTool(name="toolset-tool", ctx_type=_DependencyContainer)
     config = _build_configuration(
         tools=[cast(Tool, base_tool)],
         toolsets=[cast(Toolset, _FakeToolset(tools=[toolset_tool]))],
@@ -173,8 +177,8 @@ def test_map_tools_sets_takes_ctx_flag_from_tool_ctx(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     factory = PydanticAgentAIFactory()
-    without_context = _FakeTool(name="without-context", ctx=None)
-    with_context = _FakeTool(name="with-context", ctx={"scope": "internal"})
+    without_context = _FakeTool(name="without-context", ctx_type=None)
+    with_context = _FakeTool(name="with-context", ctx_type=_DependencyContainer)
     captured_calls: list[dict[str, object]] = []
 
     def _fake_from_schema(*args: object, **kwargs: object) -> dict[str, object]:
@@ -331,7 +335,7 @@ async def test_factory_built_agent_runs_tool_when_mocked_model_requests_it(
 ) -> None:
     factory = PydanticAgentAIFactory()
     dependency_container = _DependencyContainer(tenant_id="tenant-tools")
-    recording_tool = _RecordingTool(name="echo_tool", ctx=None)
+    recording_tool = _RecordingTool(name="echo_tool", ctx_type=None)
     config = _build_configuration(
         deps=dependency_container,
         tools=[cast(Tool, recording_tool)],
