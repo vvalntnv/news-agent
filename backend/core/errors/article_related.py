@@ -65,3 +65,17 @@ class NoScraperFoundError(InternalError):
                 details=details,
             )
         )
+
+
+class RawNewsDataAlreadyExistsError(InternalError):
+    def __init__(self, article_url: str) -> None:
+        details = {
+            "article_url": article_url,
+        }
+        super().__init__(
+            internal_payload=ErrorPayload(
+                code="raw_news_data_already_exists",
+                message="Raw news data already exists for the given article URL.",
+                details=details,
+            )
+        )

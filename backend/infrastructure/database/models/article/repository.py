@@ -1,6 +1,7 @@
 from collections.abc import Sequence
 from typing import cast
 
+from core.errors.article_related import RawNewsDataAlreadyExistsError
 from domain.news.entities import Article
 from domain.news.repository_models.article import (
     ArticleRepositoryFilters,
@@ -133,16 +134,15 @@ class TortoiseArticleRepository(ArticleRepositoryProtocol):
 
     async def _create_raw_article_data(self, article: Article) -> RawNewsData:
         existing_raw = await RawNewsData.filter(url=article.article_url).first()
+        article_url_value = article.article_url or ""
         if existing_raw is not None:
-            raise Exception(
-                "RawNewsData with this url already exists. Cannot create a new one"
-            )
+            raise RawNewsDataAlreadyExistsError(article_url_value)
 
         return await RawNewsData.create(
             title=article.title,
             raw_text=article.content.raw_content,
             quotes=article.content.quotes,
-            url=article.article_url,
+            url=article_url_value,
             author=article.author,
             timestamp=article.timestamp,
         )

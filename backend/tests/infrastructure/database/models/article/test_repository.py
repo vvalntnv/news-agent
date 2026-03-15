@@ -5,6 +5,7 @@ from unittest.mock import AsyncMock
 
 import pytest
 
+from core.errors.article_related import RawNewsDataAlreadyExistsError
 from domain.news.entities import Article
 from domain.news.repository_models.article import (
     ArticleRepositoryFilters,
@@ -162,3 +163,39 @@ async def test_update_many_returns_updated_count(
     assert updated_count == 2
     get_entries.assert_awaited_once_with(filters)
     assert apply_updates.await_count == 2
+
+
+async def test_create_raw_article_data_raises_custom_error_for_duplicate_url(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    repository = TortoiseArticleRepository()
+
+    class _FakeQuery:
+        async def first(self) -> object:
+            return object()
+
+    class _FakeRawNewsData:
+        @staticmethod
+        def filter(**_: object) -> _FakeQuery:
+            return _FakeQuery()
+
+    monkeypatch.setattr(
+        "infrastructure.database.models.article.repository.RawNewsData",
+        _FakeRawNewsData,
+    )
+
+    article = Article.model_validate(
+        {
+            "title": "title",
+            "content": {"raw_content": "<p>content</p>", "quotes": []},
+            "media": [],
+            "timestamp": "2026-03-15T10:00:00Z",
+            "author": "author",
+            "source_url": "https://example.com/news",
+        }
+    )
+
+    with pytest.raises(RawNewsDataAlreadyExistsError) as raised_error:
+        await repository._create_raw_article_data(article)
+
+    assert raised_error.value.internal_payload.code == "raw_news_data_already_exists"
