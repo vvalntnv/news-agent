@@ -4,13 +4,14 @@ import pytest
 from pydantic import BaseModel
 
 from application.ai.workflow.builder import WorkflowBuilder
+from application.ai.workflow.state import WorkflowState
 from core.errors import WorkflowLoopLimitExceededError
 from domain.ai.protocols import Agent
 
 pytestmark = pytest.mark.anyio
 
 
-class _WorkflowState(BaseModel):
+class _WorkflowState(WorkflowState):
     counter: int = 0
 
 

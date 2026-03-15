@@ -139,19 +139,38 @@ class _StubAgent:
 
 
 class _FakeWebScraperSource:
-    discovered_articles: list[NewsItem] = []
-
     def __init__(
-        self, base_url: str, registered_scrapers: list[ScrapeInformation]
+        self,
+        base_url: str,
+        registered_scrapers: list[ScrapeInformation],
+        discovered_articles: list[NewsItem],
     ) -> None:
         self.base_url = base_url
         self.registered_scrapers = registered_scrapers
+        self.discovered_articles = discovered_articles
 
     async def check_for_news(self) -> list[NewsItem]:
         return self.discovered_articles
 
     async def close(self) -> None:
         return None
+
+
+def _build_fake_web_scraper_source_factory(
+    discovered_articles: list[NewsItem],
+) -> Callable[..., _FakeWebScraperSource]:
+    def _build_fake_web_scraper_source(
+        *,
+        base_url: str,
+        registered_scrapers: list[ScrapeInformation],
+    ) -> _FakeWebScraperSource:
+        return _FakeWebScraperSource(
+            base_url=base_url,
+            registered_scrapers=registered_scrapers,
+            discovered_articles=discovered_articles,
+        )
+
+    return _build_fake_web_scraper_source
 
 
 async def test_workflow_extracts_sample_articles_and_completes_scrape_information(
@@ -161,13 +180,15 @@ async def test_workflow_extracts_sample_articles_and_completes_scrape_informatio
     partial_result = _build_partial_scrape_information(scraping_url)
     complete_result = _build_complete_scrape_information(scraping_url)
 
-    _FakeWebScraperSource.discovered_articles = [
+    discovered_articles = [
         NewsItem(title="One", url="https://news.example/a"),
         NewsItem(title="Two", url="https://news.example/b"),
         NewsItem(title="Three", url="https://news.example/c"),
     ]
     monkeypatch.setattr(
-        news_site_exploration_steps, "WebScraperSource", _FakeWebScraperSource
+        news_site_exploration_steps,
+        "WebScraperSource",
+        _build_fake_web_scraper_source_factory(discovered_articles),
     )
 
     stub_agent = _StubAgent([partial_result, complete_result])
@@ -203,12 +224,14 @@ async def test_workflow_retries_when_completed_scrape_information_is_invalid(
     invalid_completed = _build_partial_scrape_information(scraping_url)
     valid_completed = _build_complete_scrape_information(scraping_url)
 
-    _FakeWebScraperSource.discovered_articles = [
+    discovered_articles = [
         NewsItem(title="One", url="https://news.example/a"),
         NewsItem(title="Two", url="https://news.example/b"),
     ]
     monkeypatch.setattr(
-        news_site_exploration_steps, "WebScraperSource", _FakeWebScraperSource
+        news_site_exploration_steps,
+        "WebScraperSource",
+        _build_fake_web_scraper_source_factory(discovered_articles),
     )
 
     stub_agent = _StubAgent(
@@ -246,12 +269,14 @@ async def test_workflow_fails_when_validation_retries_are_exhausted(
     invalid_completed_first = _build_partial_scrape_information(scraping_url)
     invalid_completed_second = _build_partial_scrape_information(scraping_url)
 
-    _FakeWebScraperSource.discovered_articles = [
+    discovered_articles = [
         NewsItem(title="One", url="https://news.example/a"),
         NewsItem(title="Two", url="https://news.example/b"),
     ]
     monkeypatch.setattr(
-        news_site_exploration_steps, "WebScraperSource", _FakeWebScraperSource
+        news_site_exploration_steps,
+        "WebScraperSource",
+        _build_fake_web_scraper_source_factory(discovered_articles),
     )
 
     stub_agent = _StubAgent(
