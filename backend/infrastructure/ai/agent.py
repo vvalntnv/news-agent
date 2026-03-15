@@ -19,7 +19,7 @@ from infrastructure.ai.event_logger import (
 )
 
 
-class ProjectPydanticAgent[O: (BaseModel, str), D](AgentProtocol[O, D]):
+class ProjectPydanticAgent[O: BaseModel | str, D](AgentProtocol[O, D]):
     dependencies: D
 
     def __init__(

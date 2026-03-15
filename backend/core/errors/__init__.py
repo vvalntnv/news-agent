@@ -22,6 +22,14 @@ from core.errors.media_related import (
     MediaMuxMissingInitializationSegmentError,
     MediaMuxNoChunksError,
 )
+from core.errors.workflow_related import (
+    WorkflowDependencyNotConfiguredError,
+    WorkflowDependencyResolutionError,
+    WorkflowLoopLimitExceededError,
+    WorkflowNoResultError,
+    WorkflowStepRetryExhaustedError,
+    WorkflowStepValidationFailedError,
+)
 
 __all__ = [
     "ClientError",
@@ -46,4 +54,10 @@ __all__ = [
     "MediaMuxChunksInDifferentPathsError",
     "MediaMuxChunksDifferentExtensionsError",
     "MediaMuxMissingInitializationSegmentError",
+    "WorkflowDependencyNotConfiguredError",
+    "WorkflowDependencyResolutionError",
+    "WorkflowStepValidationFailedError",
+    "WorkflowStepRetryExhaustedError",
+    "WorkflowLoopLimitExceededError",
+    "WorkflowNoResultError",
 ]

@@ -2,19 +2,79 @@ from collections.abc import AsyncIterable, Callable
 from typing import cast
 
 import pytest
+from bs4 import BeautifulSoup
 
-from application.ai.workflow.predefined import news_site_exploration
+from application.ai.workflow.predefined.news_site_exploration import (
+    steps as news_site_exploration_steps,
+)
+from application.ai.workflow.predefined.news_site_exploration import (
+    validators as news_site_exploration_validators,
+)
 from application.ai.workflow.predefined.news_site_exploration import (
     NewsSiteExplorationDependencies,
     NewsSiteExplorationInput,
     NewsSiteExplorationState,
     build_news_site_exploration_workflow,
 )
+from core.config import config
+from core.errors import WorkflowStepRetryExhaustedError
 from domain.ai.protocols import Agent
 from domain.news.entities import NewsItem
 from domain.news.value_objects import ScrapeInformation
 
 pytestmark = pytest.mark.anyio
+
+
+@pytest.fixture(autouse=True)
+def stub_article_soup_fetch(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(config, "workflow_main_selector_min_text_length", 80)
+
+    async def _fake_fetch_article_soup(
+        *, client: object, article_url: str
+    ) -> BeautifulSoup:
+        _ = client
+        _ = article_url
+        html = """
+        <html>
+          <body>
+            <article class='main-content'>
+              <h1>Title</h1>
+              <p>Paragraph one with enough content for extraction validation and stable article extraction behavior across pages.</p>
+              <p>Paragraph two with additional details from the article body and multiple sentences to ensure text length is high enough for strict semantic checks.</p>
+              <div class='article-author'>Author Name</div>
+            </article>
+          </body>
+        </html>
+        """
+        return BeautifulSoup(html, "html.parser")
+
+    monkeypatch.setattr(
+        news_site_exploration_validators,
+        "_fetch_article_soup",
+        _fake_fetch_article_soup,
+    )
+
+    async def _fake_feed_selector_discovery(_result: ScrapeInformation) -> None:
+        return None
+
+    monkeypatch.setattr(
+        news_site_exploration_validators,
+        "validate_feed_selector_discovery",
+        _fake_feed_selector_discovery,
+    )
+
+    async def _fake_select_structured_article_urls(
+        *,
+        article_urls: list[str],
+        sample_size: int,
+    ) -> list[str]:
+        return article_urls[:sample_size]
+
+    monkeypatch.setattr(
+        news_site_exploration_steps,
+        "_select_structured_article_urls",
+        _fake_select_structured_article_urls,
+    )
 
 
 def _build_partial_scrape_information(scraping_url: str) -> ScrapeInformation:
@@ -42,8 +102,8 @@ def _build_complete_scrape_information(scraping_url: str) -> ScrapeInformation:
         imageContainers=["figure img"],
         videoContainers=None,
         audioContainers=None,
-        mainArticleContainer="main article",
-        authorContainer=".author",
+        mainArticleContainer="article.main-content",
+        authorContainer=".article-author",
     )
 
 
@@ -58,10 +118,12 @@ class _StubAgent:
     def __init__(self, responses: list[ScrapeInformation]) -> None:
         self._responses = responses
         self.prompts: list[str] = []
+        self.dependencies: list[NewsSiteExplorationDependencies] = []
 
     def add_dependency(
         self, dependency: NewsSiteExplorationDependencies
     ) -> "_StubAgent":
+        self.dependencies.append(dependency)
         return self
 
     async def run(self, prompt: str) -> ScrapeInformation:
@@ -105,7 +167,7 @@ async def test_workflow_extracts_sample_articles_and_completes_scrape_informatio
         NewsItem(title="Three", url="https://news.example/c"),
     ]
     monkeypatch.setattr(
-        news_site_exploration, "WebScraperSource", _FakeWebScraperSource
+        news_site_exploration_steps, "WebScraperSource", _FakeWebScraperSource
     )
 
     stub_agent = _StubAgent([partial_result, complete_result])
@@ -126,8 +188,11 @@ async def test_workflow_extracts_sample_articles_and_completes_scrape_informatio
     assert result == complete_result
     workflow_state = cast(NewsSiteExplorationState, workflow.entrypoint.state)
     assert len(workflow_state.sample_article_urls) == 2
-    assert workflow_state.attempts_made == 1
+    assert workflow_state.article_refinement_attempts == 1
     assert len(stub_agent.prompts) == 2
+    assert len(stub_agent.dependencies) == 3
+    for dependency in stub_agent.dependencies:
+        assert dependency.scraping_url == scraping_url
 
 
 async def test_workflow_retries_when_completed_scrape_information_is_invalid(
@@ -135,7 +200,6 @@ async def test_workflow_retries_when_completed_scrape_information_is_invalid(
 ) -> None:
     scraping_url = "https://news.example"
     first_partial = _build_partial_scrape_information(scraping_url)
-    second_partial = _build_partial_scrape_information(scraping_url)
     invalid_completed = _build_partial_scrape_information(scraping_url)
     valid_completed = _build_complete_scrape_information(scraping_url)
 
@@ -144,14 +208,13 @@ async def test_workflow_retries_when_completed_scrape_information_is_invalid(
         NewsItem(title="Two", url="https://news.example/b"),
     ]
     monkeypatch.setattr(
-        news_site_exploration, "WebScraperSource", _FakeWebScraperSource
+        news_site_exploration_steps, "WebScraperSource", _FakeWebScraperSource
     )
 
     stub_agent = _StubAgent(
         [
             first_partial,
             invalid_completed,
-            second_partial,
             valid_completed,
         ]
     )
@@ -171,5 +234,44 @@ async def test_workflow_retries_when_completed_scrape_information_is_invalid(
 
     assert result == valid_completed
     workflow_state = cast(NewsSiteExplorationState, workflow.entrypoint.state)
-    assert workflow_state.attempts_made == 2
-    assert len(stub_agent.prompts) == 4
+    assert workflow_state.article_refinement_attempts == 2
+    assert len(stub_agent.prompts) == 3
+
+
+async def test_workflow_fails_when_validation_retries_are_exhausted(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    scraping_url = "https://news.example"
+    partial_result = _build_partial_scrape_information(scraping_url)
+    invalid_completed_first = _build_partial_scrape_information(scraping_url)
+    invalid_completed_second = _build_partial_scrape_information(scraping_url)
+
+    _FakeWebScraperSource.discovered_articles = [
+        NewsItem(title="One", url="https://news.example/a"),
+        NewsItem(title="Two", url="https://news.example/b"),
+    ]
+    monkeypatch.setattr(
+        news_site_exploration_steps, "WebScraperSource", _FakeWebScraperSource
+    )
+
+    stub_agent = _StubAgent(
+        [
+            partial_result,
+            invalid_completed_first,
+            invalid_completed_second,
+        ]
+    )
+    workflow = build_news_site_exploration_workflow(
+        input_data=NewsSiteExplorationInput(
+            scraping_url=scraping_url,
+            max_attempts=2,
+            sample_articles_count=2,
+        ),
+        agent=cast(
+            Agent[ScrapeInformation, NewsSiteExplorationDependencies],
+            stub_agent,
+        ),
+    )
+
+    with pytest.raises(WorkflowStepRetryExhaustedError):
+        await workflow.execute_workflow()
