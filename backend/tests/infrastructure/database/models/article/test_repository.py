@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from types import SimpleNamespace
-from unittest.mock import AsyncMock
+from unittest.mock import AsyncMock, Mock
 
 import pytest
 
@@ -110,11 +110,60 @@ async def test_get_by_url_builds_domain_type(monkeypatch: pytest.MonkeyPatch) ->
     assert media_values[1].local_url is None
 
 
-async def test_update_media_local_url_forwards(monkeypatch: pytest.MonkeyPatch) -> None:
+async def test_update_media_local_url_skips_model_queries_for_empty_urls(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     repository = TortoiseArticleRepository()
 
-    updater = AsyncMock()
-    monkeypatch.setattr(repository, "update_media_local_url", updater)
+    article_filter = Mock(
+        side_effect=AssertionError("ArticleEntry.filter should not run")
+    )
+    media_filter = Mock(
+        side_effect=AssertionError("ArticleMedia.filter should not run")
+    )
+
+    monkeypatch.setattr(
+        "infrastructure.database.models.article.repository.ArticleEntry",
+        SimpleNamespace(filter=article_filter),
+    )
+    monkeypatch.setattr(
+        "infrastructure.database.models.article.repository.ArticleMedia",
+        SimpleNamespace(filter=media_filter),
+    )
+
+    await repository.update_media_local_url(
+        "", "https://example.com/video.mp4", "/tmp/movie.mp4"
+    )
+    await repository.update_media_local_url(
+        "https://example.com/article",
+        "",
+        "/tmp/movie.mp4",
+    )
+
+    article_filter.assert_not_called()
+    media_filter.assert_not_called()
+
+
+async def test_update_media_local_url_returns_when_media_not_found(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    repository = TortoiseArticleRepository()
+
+    article_entry = SimpleNamespace(id=123)
+    article_first = AsyncMock(return_value=article_entry)
+    article_filter = Mock(return_value=SimpleNamespace(first=article_first))
+
+    media_first = AsyncMock(return_value=None)
+    media_filter = Mock(return_value=SimpleNamespace(first=media_first))
+
+    monkeypatch.setattr(
+        "infrastructure.database.models.article.repository.ArticleEntry",
+        SimpleNamespace(filter=article_filter),
+    )
+    monkeypatch.setattr(
+        "infrastructure.database.models.article.repository.ArticleMedia",
+        SimpleNamespace(filter=media_filter),
+    )
 
     await repository.update_media_local_url(
         "https://example.com/article",
@@ -122,11 +171,45 @@ async def test_update_media_local_url_forwards(monkeypatch: pytest.MonkeyPatch) 
         "/tmp/movie.mp4",
     )
 
-    updater.assert_awaited_once_with(
+    article_filter.assert_called_once_with(article_url="https://example.com/article")
+    article_first.assert_awaited_once()
+    media_filter.assert_called_once_with(
+        article=article_entry,
+        source_url="https://example.com/video.mp4",
+    )
+    media_first.assert_awaited_once()
+
+
+async def test_update_media_local_url_updates_and_saves_media_row(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    repository = TortoiseArticleRepository()
+
+    article_entry = SimpleNamespace(id=321)
+    article_first = AsyncMock(return_value=article_entry)
+    article_filter = Mock(return_value=SimpleNamespace(first=article_first))
+
+    media_row = SimpleNamespace(local_url="/tmp/old.mp4", save=AsyncMock())
+    media_first = AsyncMock(return_value=media_row)
+    media_filter = Mock(return_value=SimpleNamespace(first=media_first))
+
+    monkeypatch.setattr(
+        "infrastructure.database.models.article.repository.ArticleEntry",
+        SimpleNamespace(filter=article_filter),
+    )
+    monkeypatch.setattr(
+        "infrastructure.database.models.article.repository.ArticleMedia",
+        SimpleNamespace(filter=media_filter),
+    )
+
+    await repository.update_media_local_url(
         "https://example.com/article",
         "https://example.com/video.mp4",
-        "/tmp/movie.mp4",
+        "/tmp/new.mp4",
     )
+
+    assert media_row.local_url == "/tmp/new.mp4"
+    media_row.save.assert_awaited_once()
 
 
 async def test_get_delegates_with_filters(monkeypatch: pytest.MonkeyPatch) -> None:
