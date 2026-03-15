@@ -1,4 +1,4 @@
-from .article import Article, ArticleCreate, ArticleSchema
+from .article import Article, ArticleCreate, ArticleSchema, TortoiseArticleRepository
 from .media import (
     ArticleMedia,
     ArticleMediaCreate,
@@ -14,6 +14,7 @@ __all__ = [
     "Article",
     "ArticleCreate",
     "ArticleSchema",
+    "TortoiseArticleRepository",
     "ArticleMedia",
     "ArticleMediaCreate",
     "ArticleMediaSchema",

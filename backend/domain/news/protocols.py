@@ -1,7 +1,7 @@
-from typing import Protocol, List
+from typing import Protocol
 
-from .value_objects import ScrapeInformation
-from .entities import NewsItem, Article
+from domain.news.entities import NewsItem, Article
+from domain.news.value_objects import ScrapeInformation
 
 type Host = str
 
@@ -14,7 +14,7 @@ class NewsSource(Protocol):
 
     scraping_informations: list[ScrapeInformation]
 
-    async def check_for_news(self) -> List[NewsItem]: ...
+    async def check_for_news(self) -> list[NewsItem]: ...
 
 
 class ContentExtractor(Protocol):
@@ -25,21 +25,3 @@ class ContentExtractor(Protocol):
     scraping_informations: dict[Host, ScrapeInformation]
 
     async def extract(self, item: NewsItem) -> Article: ...
-
-
-class ArticleRepository(Protocol):
-    """
-    Protocol for persisting articles.
-    """
-
-    async def create_article(self, article: Article) -> Article: ...
-
-    async def retrieve_article(self, url: str) -> Article | None: ...
-
-    async def update_article(self, article: Article) -> Article: ...
-
-    async def update_article_media_local_url(
-        self, article_url: str, source_url: str, local_url: str
-    ) -> None: ...
-
-    async def article_exists(self, url: str) -> bool: ...

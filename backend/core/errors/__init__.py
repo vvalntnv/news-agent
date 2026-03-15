@@ -3,6 +3,7 @@ from core.errors.article_related import (
     MissingAuthorError,
     MissingTitleError,
     NoScraperFoundError,
+    RawNewsDataAlreadyExistsError,
 )
 from core.errors.base import ClientError, ErrorPayload, InternalError
 from core.errors.media_related import (
@@ -31,6 +32,7 @@ __all__ = [
     "MissingArticleContentError",
     "MissingAuthorError",
     "NoScraperFoundError",
+    "RawNewsDataAlreadyExistsError",
     "DashManifestParseError",
     "DashManifestMissingPeriodError",
     "DashManifestMissingAdaptationSetError",

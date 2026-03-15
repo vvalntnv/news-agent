@@ -10,7 +10,7 @@ from faker import Faker
 from tortoise import Tortoise
 
 from core.config import config
-from infrastructure.database.repositories import TortoiseArticleRepository
+from infrastructure.database.models.article.repository import TortoiseArticleRepository
 from tests.utils.factories import ArticleFactory
 
 _IDENTIFIER_PATTERN = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*$")

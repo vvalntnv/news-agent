@@ -117,7 +117,7 @@ HtmlExtractor(registered_scrapers=scrapers, attrs_to_retain=("href",))
 
 ## Persistence Mapping
 
-Implemented in `backend/infrastructure/database/repositories.py`.
+Implemented in `backend/infrastructure/database/models/article/repository.py`.
 
 - `Article.content.raw_content` -> `RawNewsData.raw_text`
 - `Article.content.quotes` -> `RawNewsData.quotes`

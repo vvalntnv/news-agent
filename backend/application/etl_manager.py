@@ -1,5 +1,5 @@
-from typing import List
-from domain.news.protocols import NewsSource, ContentExtractor, ArticleRepository
+from domain.news.protocols import ContentExtractor, NewsSource
+from domain.news.repositories.protocols import ArticleRepositoryProtocol
 
 
 class ETLManager:
@@ -9,9 +9,9 @@ class ETLManager:
 
     def __init__(
         self,
-        sources: List[NewsSource],
+        sources: list[NewsSource],
         extractor: ContentExtractor,
-        repository: ArticleRepository,
+        repository: ArticleRepositoryProtocol,
     ):
         self.sources = sources
         self.extractor = extractor
@@ -28,7 +28,7 @@ class ETLManager:
 
                 for item in items:
                     # 2. Check if already exists (Optimization)
-                    if await self.repository.article_exists(item.url):
+                    if await self.repository.exists_by_url(item.url):
                         continue
 
                     # 3. Extract Content
@@ -36,7 +36,7 @@ class ETLManager:
                         article = await self.extractor.extract(item)
 
                         # 4. Save to Repository
-                        await self.repository.create_article(article)
+                        await self.repository.create(article)
                     except NotImplementedError:
                         # Skip extraction if not implemented (for now)
                         print(f"Extraction not implemented for {item.url}")

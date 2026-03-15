@@ -1,4 +1,4 @@
-from typing import Iterable
+from collections.abc import Iterable
 
 from domain.news.value_objects import Media, MediaType
 from infrastructure.database.models.media.model import ArticleMedia
