@@ -154,19 +154,11 @@ async def _normalize_article_level_selectors(
     if recovered_main_selector is not None:
         normalized_main_selector = recovered_main_selector
 
-    should_fallback_main_selector = _should_fallback_main_selector(
-        normalized_main_selector
-    )
-    if should_fallback_main_selector:
+    if _should_fallback_main_selector(normalized_main_selector):
         normalized_main_selector = result.main_article_container.strip()
 
-    should_fallback_author_selector = _should_fallback_author_selector(
-        normalized_author_selector
-    )
-    if should_fallback_author_selector:
-        normalized_author_selector = (
-            "a[href*='/bg/redactor/'], [itemprop='author'], .author"
-        )
+    if _should_fallback_author_selector(normalized_author_selector):
+        normalized_author_selector = result.author_container.strip()
 
     return result.model_copy(
         update={
@@ -179,7 +171,7 @@ async def _normalize_article_level_selectors(
 def _should_fallback_main_selector(selector: str) -> bool:
     is_empty_selector = selector == ""
     if is_empty_selector:
-        return False
+        return True
 
     is_deep_selector = (
         selector.count(">") > config.workflow_selector_max_child_combinators

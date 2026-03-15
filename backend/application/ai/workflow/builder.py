@@ -2,6 +2,7 @@ from typing import Self
 
 from pydantic import BaseModel
 
+from application.ai.workflow.state import WorkflowState
 from application.ai.workflow.step import (
     ConditionFunction,
     FunctionWorkflowStep,
@@ -17,7 +18,7 @@ from application.ai.workflow.workflow import (
 from domain.ai.protocols import Agent
 
 
-class WorkflowBuilder[S: BaseModel, O: BaseModel | str, D]:
+class WorkflowBuilder[S: WorkflowState, O: BaseModel | str, D]:
     def __init__(self) -> None:
         self._initial_step: WorkflowStep[S, O, D] | None = None
         self._agent: Agent[O, D] | None = None

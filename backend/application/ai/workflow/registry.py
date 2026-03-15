@@ -10,6 +10,7 @@ from application.ai.workflow.predefined.news_site_exploration import (
     NewsSiteExplorationState,
     build_news_site_exploration_workflow,
 )
+from application.ai.workflow.state import WorkflowState
 from application.ai.workflow.workflow import Workflow
 from domain.ai.protocols import Agent
 from domain.news.value_objects import ScrapeInformation
@@ -20,7 +21,7 @@ class PredefinedWorkflowName(str, Enum):
 
 
 @dataclass(frozen=True)
-class WorkflowDefinition[I: BaseModel, S: BaseModel, O: BaseModel | str, D]:
+class WorkflowDefinition[I: BaseModel, S: WorkflowState, O: BaseModel | str, D]:
     name: PredefinedWorkflowName
     description: str
     input_type: type[I]

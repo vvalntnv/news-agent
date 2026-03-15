@@ -3,6 +3,7 @@ from typing import Awaitable, Callable
 
 from pydantic import BaseModel
 
+from application.ai.workflow.state import WorkflowState
 from core.config import config
 from core.errors import (
     WorkflowDependencyNotConfiguredError,
@@ -13,11 +14,13 @@ from core.errors import (
 from application.ai.workflow.step import WorkflowStep
 from domain.ai.protocols import Agent
 
-type DependencyProvider[S: BaseModel, D] = Callable[[S], D | Awaitable[D]]
-type ResultResolver[S: BaseModel, O: BaseModel | str] = Callable[[S], O | Awaitable[O]]
+type DependencyProvider[S: WorkflowState, D] = Callable[[S], D | Awaitable[D]]
+type ResultResolver[S: WorkflowState, O: BaseModel | str] = Callable[
+    [S], O | Awaitable[O]
+]
 
 
-class Workflow[S: BaseModel, O: BaseModel | str, D]:
+class Workflow[S: WorkflowState, O: BaseModel | str, D]:
     def __init__(
         self,
         step_graph_entry: WorkflowStep[S, O, D],

@@ -10,6 +10,7 @@ from application.ai.workflow.registry import (
     PredefinedWorkflowRegistry,
     WorkflowDefinition,
 )
+from application.ai.workflow.state import WorkflowState
 from application.ai.workflow.step import (
     FunctionWorkflowStep,
     StepValidator,
@@ -27,6 +28,7 @@ __all__ = [
     "Workflow",
     "WorkflowBuilder",
     "WorkflowDefinition",
+    "WorkflowState",
     "FunctionWorkflowStep",
     "StepValidator",
     "WorkflowStep",

@@ -43,19 +43,20 @@ def build_news_site_exploration_workflow(
         NewsSiteExplorationDependencies,
     ]()
 
-    builder.register_function_step(
-        state=state,
-        function=explore_news_site_step,
-    ).register_function_step(
-        state=state,
-        function=extract_sample_articles_step,
-    ).register_function_step(
-        state=state,
-        function=explore_articles_step,
-    )
-
-    return (
-        builder.set_workflow_name("news_site_exploration")
+    workflow = (
+        builder.register_function_step(
+            state=state,
+            function=explore_news_site_step,
+        )
+        .register_function_step(
+            state=state,
+            function=extract_sample_articles_step,
+        )
+        .register_function_step(
+            state=state,
+            function=explore_articles_step,
+        )
+        .set_workflow_name("news_site_exploration")
         .add_starting_step(explore_news_site_step)
         .add_default_agent(agent)
         .with_dependency_provider(build_dependencies)
@@ -69,3 +70,5 @@ def build_news_site_exploration_workflow(
         )
         .build()
     )
+
+    return workflow

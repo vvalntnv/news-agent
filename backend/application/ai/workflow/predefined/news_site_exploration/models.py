@@ -1,5 +1,6 @@
 from pydantic import BaseModel, Field
 
+from application.ai.workflow.state import WorkflowState
 from domain.news.value_objects import ScrapeInformation
 
 
@@ -15,12 +16,11 @@ class NewsSiteExplorationDependencies(BaseModel):
     scraping_url: str
 
 
-class NewsSiteExplorationState(BaseModel):
+class NewsSiteExplorationState(WorkflowState):
     input_data: NewsSiteExplorationInput
     scraping_url: str
     max_attempts: int
     article_refinement_attempts: int = 0
-    last_validation_error: str | None = None
     sample_articles_count: int
     sample_article_urls: list[str] = Field(default_factory=list)
     latest_result: ScrapeInformation | None = None

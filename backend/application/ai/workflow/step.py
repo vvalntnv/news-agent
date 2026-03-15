@@ -5,6 +5,7 @@ from typing import Awaitable
 
 from pydantic import BaseModel
 
+from application.ai.workflow.state import WorkflowState
 from core.config import config
 from core.errors import (
     WorkflowStepRetryExhaustedError,
@@ -12,16 +13,16 @@ from core.errors import (
 )
 from domain.ai.protocols import Agent
 
-type ConditionFunction[S: BaseModel] = Callable[[S], bool]
-type StepValidator[S: BaseModel, O: BaseModel | str] = Callable[
+type ConditionFunction[S: WorkflowState] = Callable[[S], bool]
+type StepValidator[S: WorkflowState, O: BaseModel | str] = Callable[
     [S, O], None | Awaitable[None]
 ]
-type StepFunction[S: BaseModel, O: BaseModel | str, D] = Callable[
+type StepFunction[S: WorkflowState, O: BaseModel | str, D] = Callable[
     [S, Agent[O, D]], O | Awaitable[O]
 ]
 
 
-class WorkflowStep[S: BaseModel, O: BaseModel | str, D](ABC):
+class WorkflowStep[S: WorkflowState, O: BaseModel | str, D](ABC):
     name: str
     state: S
     has_executed: bool
@@ -63,20 +64,16 @@ class WorkflowStep[S: BaseModel, O: BaseModel | str, D](ABC):
             try:
                 await self._run_validators(result=result, attempt_number=attempt_number)
             except WorkflowStepValidationFailedError as validation_error:
-                has_validation_error_slot = hasattr(self.state, "last_validation_error")
-                if has_validation_error_slot:
-                    validation_reason: str | None = None
-                    payload_details = validation_error.internal_payload.details
-                    if payload_details is not None:
-                        validation_reason = payload_details.get("reason")
+                validation_reason: str | None = None
+                payload_details = validation_error.internal_payload.details
+                if payload_details is not None:
+                    validation_reason = payload_details.get("reason")
 
-                    setattr(
-                        self.state,
-                        "last_validation_error",
-                        validation_reason or validation_error.internal_payload.message,
-                    )
+                self.state.last_validation_error = (
+                    validation_reason or validation_error.internal_payload.message
+                )
 
-                has_retries_remaining = attempt_number <= self.validation_max_retries
+                has_retries_remaining = attempt_number < self.validation_max_retries
                 if has_retries_remaining:
                     attempt_number += 1
                     continue
@@ -90,9 +87,7 @@ class WorkflowStep[S: BaseModel, O: BaseModel | str, D](ABC):
 
             self.has_executed = True
             self.result = result
-            has_validation_error_slot = hasattr(self.state, "last_validation_error")
-            if has_validation_error_slot:
-                setattr(self.state, "last_validation_error", None)
+            self.state.last_validation_error = None
             return result
 
     @abstractmethod
@@ -148,7 +143,9 @@ class WorkflowStep[S: BaseModel, O: BaseModel | str, D](ABC):
         return None
 
 
-class FunctionWorkflowStep[S: BaseModel, O: BaseModel | str, D](WorkflowStep[S, O, D]):
+class FunctionWorkflowStep[S: WorkflowState, O: BaseModel | str, D](
+    WorkflowStep[S, O, D]
+):
     def __init__(
         self,
         *,
