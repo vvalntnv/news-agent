@@ -3,7 +3,6 @@ from __future__ import annotations
 import asyncio
 from collections.abc import Callable, Coroutine
 from concurrent.futures import Future, ThreadPoolExecutor
-from typing import TypeVar
 
 
 class AsyncRunner[R]:

@@ -1,3 +1,4 @@
+from collections.abc import Generator
 from unittest.mock import AsyncMock
 
 import pytest
@@ -11,6 +12,21 @@ from infrastructure.background_jobs.tasks import media_download as task_module
 class _EnqueueResultStub:
     def __init__(self, task_id: str | None) -> None:
         self.id = task_id
+
+
+@pytest.fixture
+def eager_mode_celery_config(monkeypatch: pytest.MonkeyPatch) -> Generator[None, None, None]:
+    """Temporarily enable eager mode for Celery tasks with proper cleanup."""
+    previous_task_always_eager = celery_app.conf.task_always_eager
+    previous_task_eager_propagates = celery_app.conf.task_eager_propagates
+
+    celery_app.conf.task_always_eager = True
+    celery_app.conf.task_eager_propagates = True
+
+    yield
+
+    celery_app.conf.task_always_eager = previous_task_always_eager
+    celery_app.conf.task_eager_propagates = previous_task_eager_propagates
 
 
 def test_enqueue_job_serializes_pydantic_payload(
@@ -52,6 +68,7 @@ def test_enqueue_job_raises_when_task_id_is_empty(
 
 def test_enqueuer_runs_media_job_in_eager_mode(
     monkeypatch: pytest.MonkeyPatch,
+    eager_mode_celery_config: None,
 ) -> None:
     service_mock = AsyncMock()
 
@@ -61,22 +78,12 @@ def test_enqueuer_runs_media_job_in_eager_mode(
 
     monkeypatch.setattr(task_module, "MediaDownloadService", _ServiceStub)
 
-    previous_task_always_eager = celery_app.conf.task_always_eager
-    previous_task_eager_propagates = celery_app.conf.task_eager_propagates
+    payload = MediaDownloadJobPayload(
+        source_urls=["https://example.com/eager.mp4"],
+    )
 
-    celery_app.conf.task_always_eager = True
-    celery_app.conf.task_eager_propagates = True
+    enqueuer = CeleryBackgroundJobEnqueuer()
+    result = enqueuer.enqueue_media_download_job(payload)
 
-    try:
-        payload = MediaDownloadJobPayload(
-            source_urls=["https://example.com/eager.mp4"],
-        )
-
-        enqueuer = CeleryBackgroundJobEnqueuer()
-        result = enqueuer.enqueue_media_download_job(payload)
-
-        assert len(result.task_id) > 0
-        service_mock.assert_awaited_once()
-    finally:
-        celery_app.conf.task_always_eager = previous_task_always_eager
-        celery_app.conf.task_eager_propagates = previous_task_eager_propagates
+    assert len(result.task_id) > 0
+    service_mock.assert_awaited_once()
