@@ -5,9 +5,6 @@ import pytest
 from bs4 import BeautifulSoup
 
 from application.ai.workflow.predefined.news_site_exploration import (
-    steps as news_site_exploration_steps,
-)
-from application.ai.workflow.predefined.news_site_exploration import (
     validators as news_site_exploration_validators,
 )
 from application.ai.workflow.predefined.news_site_exploration import (
@@ -15,6 +12,12 @@ from application.ai.workflow.predefined.news_site_exploration import (
     NewsSiteExplorationInput,
     NewsSiteExplorationState,
     build_news_site_exploration_workflow,
+)
+from application.ai.workflow.predefined.news_site_exploration.steps import (
+    extract_sample_articles_step as extract_sample_articles_step_module,
+)
+from application.ai.workflow.predefined.news_site_exploration.steps.extract_sample_articles_step import (
+    ExtractSampleArticlesStep,
 )
 from core.config import config
 from core.errors import WorkflowStepRetryExhaustedError
@@ -64,14 +67,16 @@ def stub_article_soup_fetch(monkeypatch: pytest.MonkeyPatch) -> None:
     )
 
     async def _fake_select_structured_article_urls(
+        self: ExtractSampleArticlesStep,
         *,
         article_urls: list[str],
         sample_size: int,
     ) -> list[str]:
+        _ = self
         return article_urls[:sample_size]
 
     monkeypatch.setattr(
-        news_site_exploration_steps,
+        ExtractSampleArticlesStep,
         "_select_structured_article_urls",
         _fake_select_structured_article_urls,
     )
@@ -186,7 +191,7 @@ async def test_workflow_extracts_sample_articles_and_completes_scrape_informatio
         NewsItem(title="Three", url="https://news.example/c"),
     ]
     monkeypatch.setattr(
-        news_site_exploration_steps,
+        extract_sample_articles_step_module,
         "WebScraperSource",
         _build_fake_web_scraper_source_factory(discovered_articles),
     )
@@ -229,7 +234,7 @@ async def test_workflow_retries_when_completed_scrape_information_is_invalid(
         NewsItem(title="Two", url="https://news.example/b"),
     ]
     monkeypatch.setattr(
-        news_site_exploration_steps,
+        extract_sample_articles_step_module,
         "WebScraperSource",
         _build_fake_web_scraper_source_factory(discovered_articles),
     )
@@ -274,7 +279,7 @@ async def test_workflow_fails_when_validation_retries_are_exhausted(
         NewsItem(title="Two", url="https://news.example/b"),
     ]
     monkeypatch.setattr(
-        news_site_exploration_steps,
+        extract_sample_articles_step_module,
         "WebScraperSource",
         _build_fake_web_scraper_source_factory(discovered_articles),
     )

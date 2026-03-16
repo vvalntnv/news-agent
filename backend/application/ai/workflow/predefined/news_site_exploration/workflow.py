@@ -9,9 +9,9 @@ from application.ai.workflow.predefined.news_site_exploration.models import (
     NewsSiteExplorationState,
 )
 from application.ai.workflow.predefined.news_site_exploration.steps import (
-    explore_articles_step,
-    explore_news_site_step,
-    extract_sample_articles_step,
+    ExploreArticlesStep,
+    ExploreNewsSiteStep,
+    ExtractSampleArticlesStep,
 )
 from application.ai.workflow.predefined.news_site_exploration.validators import (
     validate_scrape_information,
@@ -43,20 +43,12 @@ def build_news_site_exploration_workflow(
         NewsSiteExplorationDependencies,
     ]()
 
+    explore_news_site_step = ExploreNewsSiteStep(state=state)
+    extract_sample_articles_step = ExtractSampleArticlesStep(state=state)
+    explore_articles_step = ExploreArticlesStep(state=state)
+
     workflow = (
-        builder.register_function_step(
-            state=state,
-            function=explore_news_site_step,
-        )
-        .register_function_step(
-            state=state,
-            function=extract_sample_articles_step,
-        )
-        .register_function_step(
-            state=state,
-            function=explore_articles_step,
-        )
-        .set_workflow_name("news_site_exploration")
+        builder.set_workflow_name("news_site_exploration")
         .add_starting_step(explore_news_site_step)
         .add_default_agent(agent)
         .with_dependency_provider(build_dependencies)
