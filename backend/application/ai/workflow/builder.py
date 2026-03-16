@@ -15,6 +15,7 @@ from application.ai.workflow.workflow import (
     ResultResolver,
     Workflow,
 )
+from core.errors import WorkflowFunctionStepNotRegisteredError
 from domain.ai.protocols import Agent
 
 
@@ -173,6 +174,7 @@ class WorkflowBuilder[S: WorkflowState, O: BaseModel | str, D]:
         run: StepFunction[S, O, D],
         name: str | None = None,
     ) -> FunctionWorkflowStep[S, O, D]:
+        """Backward-compatible alias for create_function_step."""
         return self.create_function_step(state=state, run=run, name=name)
 
     def add_validator(
@@ -205,6 +207,5 @@ class WorkflowBuilder[S: WorkflowState, O: BaseModel | str, D]:
         if cached_step is not None:
             return cached_step
 
-        raise Exception(
-            "Function workflow step not registered in the builder! Please use the .register_function_step method to register this funciton"
-        )
+        function_name = getattr(function, "__name__", "<anonymous>")
+        raise WorkflowFunctionStepNotRegisteredError(function_name=function_name)

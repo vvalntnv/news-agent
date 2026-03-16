@@ -3,10 +3,15 @@ import re
 import httpx
 from bs4 import BeautifulSoup, Tag
 
-from core.config import config
 from application.ai.workflow.predefined.news_site_exploration.models import (
     NewsSiteExplorationState,
 )
+from application.ai.workflow.predefined.news_site_exploration.selector_utils import (
+    build_article_http_client,
+    build_main_node_content_stats,
+    looks_like_generic_tag_chain,
+)
+from core.config import config
 from domain.news.value_objects import ScrapeInformation
 from infrastructure.sources.web_scraper_source import WebScraperSource
 
@@ -80,14 +85,7 @@ async def validate_selector_semantics_against_sample_articles(
     if len(sample_article_urls) == 0:
         raise ValueError("No sample article URLs available for semantic validation")
 
-    async with httpx.AsyncClient(
-        headers={
-            "User-Agent": config.media_http_user_agent,
-            "Accept": "text/html,application/xhtml+xml",
-        },
-        follow_redirects=config.media_http_follow_redirects,
-        timeout=config.media_http_timeout_seconds,
-    ) as client:
+    async with build_article_http_client() as client:
         for sample_url in sample_article_urls:
             soup = await _fetch_article_soup(client=client, article_url=sample_url)
             _assert_main_selector_is_semantically_valid(
@@ -132,26 +130,10 @@ def _uses_positional_pseudo(selector: str) -> bool:
 
 
 def _is_generic_tag_chain(selector: str) -> bool:
-    known_safe_generic_chains = {"main article"}
-    if selector.strip() in known_safe_generic_chains:
-        return False
-
-    has_anchor_tokens = any(
-        token in selector for token in [".", "#", "[", "data-", "itemprop", "role="]
+    return looks_like_generic_tag_chain(
+        selector,
+        known_safe_generic_chains={"main article"},
     )
-    if has_anchor_tokens:
-        return False
-
-    normalized_selector = selector.replace(">", " ")
-    parts = [part.strip() for part in normalized_selector.split() if part.strip() != ""]
-    if len(parts) <= 1:
-        return False
-
-    plain_tag_pattern = re.compile(r"^[a-zA-Z][a-zA-Z0-9_-]*$")
-    are_all_plain_tags = all(
-        plain_tag_pattern.match(part) is not None for part in parts
-    )
-    return are_all_plain_tags
 
 
 async def _fetch_article_soup(
@@ -185,8 +167,8 @@ def _assert_main_selector_is_semantically_valid(
 
 
 def _assert_main_node_has_enough_content(*, main_node: Tag, article_url: str) -> None:
-    text_content = main_node.get_text(" ", strip=True)
-    text_length = len(text_content)
+    content_stats = build_main_node_content_stats(main_node)
+    text_length = content_stats.text_length
     min_text_length = config.workflow_main_selector_min_text_length
     has_enough_text = text_length >= min_text_length
     if not has_enough_text:
@@ -195,7 +177,7 @@ def _assert_main_node_has_enough_content(*, main_node: Tag, article_url: str) ->
             f"extraction. url={article_url}, text_length={text_length}"
         )
 
-    paragraph_count = len(main_node.select("p"))
+    paragraph_count = content_stats.paragraph_count
     min_paragraph_count = config.workflow_main_selector_min_paragraph_count
     has_enough_paragraphs = paragraph_count >= min_paragraph_count
     if not has_enough_paragraphs:

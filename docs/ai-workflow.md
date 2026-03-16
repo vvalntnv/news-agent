@@ -58,7 +58,9 @@ Key methods:
 - `add_starting_step(step)` / `initialize(step)`
 - `add_step(start, end)`
 - `add_transition(premise, condition, consequence)`
-- `add_function_step(state=..., run=..., name=..., start=...)`
+- `register_function_step(state=..., function=..., name=...)`
+- `create_function_step(state=..., run=..., name=...)`
+- `create_callable_step(state=..., run=..., name=...)` (backward-compatible alias)
 - `add_validator(step, validator)`
 - `set_step_validation_retries(step, max_retries)`
 - `with_dependencies(dependencies)`

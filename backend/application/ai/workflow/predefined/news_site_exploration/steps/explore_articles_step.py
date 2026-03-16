@@ -1,11 +1,14 @@
-import re
-
-import httpx
 from bs4 import BeautifulSoup
 
 from application.ai.workflow.predefined.news_site_exploration.models import (
     NewsSiteExplorationDependencies,
     NewsSiteExplorationState,
+)
+from application.ai.workflow.predefined.news_site_exploration.selector_utils import (
+    STABLE_MAIN_SELECTOR_CANDIDATES,
+    build_article_http_client,
+    is_main_selector_candidate_valid,
+    looks_like_generic_tag_chain,
 )
 from application.ai.workflow.predefined.news_site_exploration.prompts import (
     build_article_exploration_prompt,
@@ -140,7 +143,7 @@ class ExploreArticlesStep(
             "body article",
             "h1 + div",
         }
-        is_generic_chain = self._looks_like_generic_chain(selector)
+        is_generic_chain = looks_like_generic_tag_chain(selector)
         ends_in_paragraph_target = selector.strip().endswith(
             "> p"
         ) or selector.strip().endswith(" p")
@@ -165,48 +168,11 @@ class ExploreArticlesStep(
         )
         return has_positional_pseudo
 
-    def _looks_like_generic_chain(self, selector: str) -> bool:
-        has_anchor_tokens = any(
-            token in selector for token in [".", "#", "[", "data-", "itemprop", "role="]
-        )
-        if has_anchor_tokens:
-            return False
-
-        normalized_selector = selector.replace(">", " ")
-        parts = [
-            part.strip() for part in normalized_selector.split() if part.strip() != ""
-        ]
-        if len(parts) <= 1:
-            return False
-
-        plain_tag_pattern = re.compile(r"^[a-zA-Z][a-zA-Z0-9_-]*$")
-        return all(plain_tag_pattern.match(part) is not None for part in parts)
-
     async def _recover_stable_main_selector(
         self,
         sample_article_urls: list[str],
     ) -> str | None:
-        candidate_selectors = [
-            "article[itemprop='articleBody']",
-            "[itemprop='articleBody']",
-            "main article",
-            "[role='main'] article",
-            "main",
-            "[role='main']",
-            "article",
-            ".article-content",
-            ".news-content",
-            ".post-content",
-        ]
-
-        async with httpx.AsyncClient(
-            headers={
-                "User-Agent": config.media_http_user_agent,
-                "Accept": "text/html,application/xhtml+xml",
-            },
-            follow_redirects=config.media_http_follow_redirects,
-            timeout=config.media_http_timeout_seconds,
-        ) as client:
+        async with build_article_http_client() as client:
             soups: list[BeautifulSoup] = []
             for sample_url in sample_article_urls:
                 try:
@@ -220,9 +186,9 @@ class ExploreArticlesStep(
         if len(soups) == 0:
             return None
 
-        for candidate_selector in candidate_selectors:
+        for candidate_selector in STABLE_MAIN_SELECTOR_CANDIDATES:
             is_valid_for_all = all(
-                self._is_main_selector_candidate_valid(
+                is_main_selector_candidate_valid(
                     soup=soup,
                     selector=candidate_selector,
                 )
@@ -232,29 +198,3 @@ class ExploreArticlesStep(
                 return candidate_selector
 
         return None
-
-    def _is_main_selector_candidate_valid(
-        self,
-        *,
-        soup: BeautifulSoup,
-        selector: str,
-    ) -> bool:
-        matched_nodes = soup.select(selector)
-        has_single_match = len(matched_nodes) == 1
-        if not has_single_match:
-            return False
-
-        matched_node = matched_nodes[0]
-        text_length = len(matched_node.get_text(" ", strip=True))
-        has_enough_text = text_length >= config.workflow_main_selector_min_text_length
-        if not has_enough_text:
-            return False
-
-        paragraph_count = len(matched_node.select("p"))
-        has_enough_paragraphs = (
-            paragraph_count >= config.workflow_main_selector_min_paragraph_count
-        )
-        if not has_enough_paragraphs:
-            return False
-
-        return True

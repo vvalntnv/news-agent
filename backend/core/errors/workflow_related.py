@@ -107,3 +107,20 @@ class WorkflowNoResultError(InternalError):
                 },
             )
         )
+
+
+class WorkflowFunctionStepNotRegisteredError(InternalError):
+    def __init__(self, function_name: str) -> None:
+        super().__init__(
+            internal_payload=ErrorPayload(
+                code="workflow_function_step_not_registered",
+                message="Function workflow step is not registered in the workflow builder.",
+                details={
+                    "function_name": function_name,
+                    "hint": (
+                        "Register the function first with "
+                        "register_function_step(state=..., function=...)."
+                    ),
+                },
+            )
+        )

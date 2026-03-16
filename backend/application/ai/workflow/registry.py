@@ -1,6 +1,6 @@
 from dataclasses import dataclass
 from enum import Enum
-from typing import Callable
+from typing import Callable, cast
 
 from pydantic import BaseModel
 
@@ -29,17 +29,17 @@ class WorkflowDefinition[I: BaseModel, S: WorkflowState, O: BaseModel | str, D]:
     factory: Callable[[I, Agent[O, D]], Workflow[S, O, D]]
 
 
+type GenericWorkflowDefinition = WorkflowDefinition[
+    BaseModel,
+    WorkflowState,
+    BaseModel | str,
+    object,
+]
+
+
 class PredefinedWorkflowRegistry:
     def __init__(self) -> None:
-        self._definitions: dict[
-            PredefinedWorkflowName,
-            WorkflowDefinition[
-                NewsSiteExplorationInput,
-                NewsSiteExplorationState,
-                ScrapeInformation,
-                NewsSiteExplorationDependencies,
-            ],
-        ] = {}
+        self._definitions: dict[PredefinedWorkflowName, GenericWorkflowDefinition] = {}
 
         self._register_definition(
             WorkflowDefinition[
@@ -59,14 +59,9 @@ class PredefinedWorkflowRegistry:
             )
         )
 
-    def _register_definition(
+    def _register_definition[I: BaseModel, S: WorkflowState, O: BaseModel | str, D](
         self,
-        definition: WorkflowDefinition[
-            NewsSiteExplorationInput,
-            NewsSiteExplorationState,
-            ScrapeInformation,
-            NewsSiteExplorationDependencies,
-        ],
+        definition: WorkflowDefinition[I, S, O, D],
     ) -> None:
         is_already_registered = definition.name in self._definitions
         if is_already_registered:
@@ -74,7 +69,7 @@ class PredefinedWorkflowRegistry:
                 f"Workflow '{definition.name.value}' is already registered"
             )
 
-        self._definitions[definition.name] = definition
+        self._definitions[definition.name] = cast(GenericWorkflowDefinition, definition)
 
     def list_workflows(self) -> tuple[PredefinedWorkflowName, ...]:
         return tuple(self._definitions.keys())
@@ -88,18 +83,22 @@ class PredefinedWorkflowRegistry:
         ScrapeInformation,
         NewsSiteExplorationDependencies,
     ]:
-        definition = self.get(PredefinedWorkflowName.NEWS_SITE_EXPLORATION)
+        generic_definition = self.get(PredefinedWorkflowName.NEWS_SITE_EXPLORATION)
+        definition = cast(
+            WorkflowDefinition[
+                NewsSiteExplorationInput,
+                NewsSiteExplorationState,
+                ScrapeInformation,
+                NewsSiteExplorationDependencies,
+            ],
+            generic_definition,
+        )
         return definition.factory(input_data, agent)
 
     def get(
         self,
         workflow_name: PredefinedWorkflowName,
-    ) -> WorkflowDefinition[
-        NewsSiteExplorationInput,
-        NewsSiteExplorationState,
-        ScrapeInformation,
-        NewsSiteExplorationDependencies,
-    ]:
+    ) -> GenericWorkflowDefinition:
         definition = self._definitions.get(workflow_name)
         if definition is not None:
             return definition

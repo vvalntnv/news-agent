@@ -25,6 +25,7 @@ from core.errors.media_related import (
 from core.errors.workflow_related import (
     WorkflowDependencyNotConfiguredError,
     WorkflowDependencyResolutionError,
+    WorkflowFunctionStepNotRegisteredError,
     WorkflowLoopLimitExceededError,
     WorkflowNoResultError,
     WorkflowStepRetryExhaustedError,
@@ -56,6 +57,7 @@ __all__ = [
     "MediaMuxMissingInitializationSegmentError",
     "WorkflowDependencyNotConfiguredError",
     "WorkflowDependencyResolutionError",
+    "WorkflowFunctionStepNotRegisteredError",
     "WorkflowStepValidationFailedError",
     "WorkflowStepRetryExhaustedError",
     "WorkflowLoopLimitExceededError",

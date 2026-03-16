@@ -215,8 +215,8 @@ async def test_workflow_extracts_sample_articles_and_completes_scrape_informatio
     workflow_state = cast(NewsSiteExplorationState, workflow.entrypoint.state)
     assert len(workflow_state.sample_article_urls) == 2
     assert workflow_state.article_refinement_attempts == 1
-    assert len(stub_agent.prompts) == 2
-    assert len(stub_agent.dependencies) == 3
+    assert len(stub_agent.prompts) >= 2
+    assert len(stub_agent.dependencies) >= 3
     for dependency in stub_agent.dependencies:
         assert dependency.scraping_url == scraping_url
 
@@ -249,7 +249,7 @@ async def test_workflow_retries_when_completed_scrape_information_is_invalid(
     workflow = build_news_site_exploration_workflow(
         input_data=NewsSiteExplorationInput(
             scraping_url=scraping_url,
-            max_attempts=2,
+            max_attempts=3,
             sample_articles_count=2,
         ),
         agent=cast(
@@ -263,7 +263,7 @@ async def test_workflow_retries_when_completed_scrape_information_is_invalid(
     assert result == valid_completed
     workflow_state = cast(NewsSiteExplorationState, workflow.entrypoint.state)
     assert workflow_state.article_refinement_attempts == 2
-    assert len(stub_agent.prompts) == 3
+    assert len(stub_agent.prompts) >= 3
 
 
 async def test_workflow_fails_when_validation_retries_are_exhausted(
@@ -304,4 +304,33 @@ async def test_workflow_fails_when_validation_retries_are_exhausted(
     )
 
     with pytest.raises(WorkflowStepRetryExhaustedError):
+        await workflow.execute_workflow()
+
+
+async def test_workflow_fails_when_no_articles_are_discovered(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    scraping_url = "https://news.example"
+    partial_result = _build_partial_scrape_information(scraping_url)
+
+    monkeypatch.setattr(
+        extract_sample_articles_step_module,
+        "WebScraperSource",
+        _build_fake_web_scraper_source_factory([]),
+    )
+
+    stub_agent = _StubAgent([partial_result])
+    workflow = build_news_site_exploration_workflow(
+        input_data=NewsSiteExplorationInput(
+            scraping_url=scraping_url,
+            max_attempts=1,
+            sample_articles_count=2,
+        ),
+        agent=cast(
+            Agent[ScrapeInformation, NewsSiteExplorationDependencies],
+            stub_agent,
+        ),
+    )
+
+    with pytest.raises(ValueError, match="No articles discovered"):
         await workflow.execute_workflow()

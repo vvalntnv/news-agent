@@ -1,14 +1,20 @@
 import pytest
 from bs4 import BeautifulSoup
 
+from application.ai.workflow.predefined.news_site_exploration import (
+    validators as validators_module,
+)
 from core.config import config
 from application.ai.workflow.predefined.news_site_exploration.models import (
     NewsSiteExplorationInput,
     NewsSiteExplorationState,
 )
 from application.ai.workflow.predefined.news_site_exploration.validators import (
+    validate_feed_selector_discovery,
+    validate_selector_stability,
     validate_scrape_information,
 )
+from domain.news.entities import NewsItem
 from domain.news.value_objects import ScrapeInformation
 
 pytestmark = pytest.mark.anyio
@@ -110,3 +116,121 @@ async def test_validator_rejects_link_heavy_main_selector(
             _build_state(),
             _build_result("article.main-content"),
         )
+
+
+async def test_validator_rejects_when_sample_urls_are_missing() -> None:
+    state = _build_state()
+    state.sample_article_urls = []
+
+    with pytest.raises(ValueError, match="No sample article URLs"):
+        await validate_scrape_information(state, _build_result("article.main-content"))
+
+
+async def test_validator_rejects_main_selector_with_too_little_text(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(config, "workflow_main_selector_min_text_length", 200)
+
+    async def _fake_fetch_article_soup(
+        *, client: object, article_url: str
+    ) -> BeautifulSoup:
+        _ = client
+        _ = article_url
+        return BeautifulSoup(
+            """
+            <html><body>
+              <article class='main-content'>
+                <p>short</p>
+                <p>short</p>
+              </article>
+            </body></html>
+            """,
+            "html.parser",
+        )
+
+    monkeypatch.setattr(
+        "application.ai.workflow.predefined.news_site_exploration.validators._fetch_article_soup",
+        _fake_fetch_article_soup,
+    )
+
+    with pytest.raises(ValueError, match="too little text content"):
+        await validate_scrape_information(
+            _build_state(),
+            _build_result("article.main-content"),
+        )
+
+
+async def test_validator_rejects_main_selector_with_too_few_paragraphs(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(config, "workflow_main_selector_min_text_length", 20)
+    monkeypatch.setattr(config, "workflow_main_selector_min_paragraph_count", 3)
+
+    async def _fake_fetch_article_soup(
+        *, client: object, article_url: str
+    ) -> BeautifulSoup:
+        _ = client
+        _ = article_url
+        return BeautifulSoup(
+            """
+            <html><body>
+              <article class='main-content'>
+                <p>Paragraph one with enough length.</p>
+                <p>Paragraph two with enough length.</p>
+              </article>
+            </body></html>
+            """,
+            "html.parser",
+        )
+
+    monkeypatch.setattr(
+        "application.ai.workflow.predefined.news_site_exploration.validators._fetch_article_soup",
+        _fake_fetch_article_soup,
+    )
+
+    with pytest.raises(ValueError, match="too few paragraph elements"):
+        await validate_scrape_information(
+            _build_state(),
+            _build_result("article.main-content"),
+        )
+
+
+def test_selector_stability_rejects_deep_main_selector() -> None:
+    deep_main_selector = "main > div > div > article > div > p"
+
+    with pytest.raises(ValueError, match="too deep and brittle"):
+        validate_selector_stability(_build_result(deep_main_selector))
+
+
+def test_selector_stability_rejects_positional_author_selector() -> None:
+    result = _build_result("article.main-content")
+    result.author_container = ".author:nth-child(2)"
+
+    with pytest.raises(ValueError, match="uses positional pseudo selectors"):
+        validate_selector_stability(result)
+
+
+async def test_feed_discovery_validation_raises_when_no_news_found(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    class _FakeEmptyWebScraperSource:
+        def __init__(
+            self,
+            base_url: str,
+            registered_scrapers: list[ScrapeInformation],
+        ) -> None:
+            _ = base_url
+            _ = registered_scrapers
+
+        async def check_for_news(self) -> list[NewsItem]:
+            return []
+
+        async def close(self) -> None:
+            return None
+
+    monkeypatch.setattr(
+        validators_module, "WebScraperSource", _FakeEmptyWebScraperSource
+    )
+
+    with pytest.raises(ValueError, match="no news links were discovered"):
+        await validate_feed_selector_discovery(_build_result("article.main-content"))

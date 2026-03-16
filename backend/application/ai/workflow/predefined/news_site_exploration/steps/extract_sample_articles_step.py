@@ -1,13 +1,19 @@
 from typing import Iterable
-import httpx
+
 from bs4 import BeautifulSoup
 
 from application.ai.workflow.predefined.news_site_exploration.models import (
     NewsSiteExplorationDependencies,
     NewsSiteExplorationState,
 )
+from application.ai.workflow.predefined.news_site_exploration.selector_utils import (
+    STABLE_MAIN_SELECTOR_CANDIDATES,
+    USABLE_MAIN_SELECTOR_CANDIDATES,
+    build_article_http_client,
+    has_selector_match_with_minimum_content,
+    is_main_selector_candidate_valid,
+)
 from application.ai.workflow.step import WorkflowStep
-from core.config import config
 from domain.news.value_objects import ScrapeInformation
 from infrastructure.sources.web_scraper_source import WebScraperSource
 
@@ -53,14 +59,7 @@ class ExtractSampleArticlesStep(
         page_contents: dict[str, bytes] = {}
         selected_urls: list[str] = []
 
-        async with httpx.AsyncClient(
-            headers={
-                "User-Agent": config.media_http_user_agent,
-                "Accept": "text/html,application/xhtml+xml",
-            },
-            follow_redirects=config.media_http_follow_redirects,
-            timeout=config.media_http_timeout_seconds,
-        ) as client:
+        async with build_article_http_client() as client:
             for article_url in article_urls:
                 if len(selected_urls) >= sample_size:
                     break
@@ -109,28 +108,14 @@ class ExtractSampleArticlesStep(
         ) and has_usable_main_candidate
 
     def _has_usable_main_candidate(self, soup: BeautifulSoup) -> bool:
-        candidate_selectors = [
-            "article[itemprop='articleBody']",
-            "[itemprop='articleBody']",
-            "main article",
-            "[role='main'] article",
-            "article",
-            "main",
-        ]
-
-        for selector in candidate_selectors:
-            matched_nodes = soup.select(selector)
-            has_single_match = len(matched_nodes) == 1
-            if not has_single_match:
-                continue
-
-            node = matched_nodes[0]
-            text_length = len(node.get_text(" ", strip=True))
-            paragraph_count = len(node.select("p"))
-            has_enough_text = text_length >= 120
-            has_enough_paragraphs = paragraph_count >= 2
-
-            if has_enough_text and has_enough_paragraphs:
+        for selector in USABLE_MAIN_SELECTOR_CANDIDATES:
+            has_match = has_selector_match_with_minimum_content(
+                soup=soup,
+                selector=selector,
+                min_text_length=120,
+                min_paragraph_count=2,
+            )
+            if has_match:
                 return True
 
         return False
@@ -139,27 +124,14 @@ class ExtractSampleArticlesStep(
         self,
         page_contents: Iterable[bytes],
     ) -> str | None:
-        candidate_selectors = [
-            "article[itemprop='articleBody']",
-            "[itemprop='articleBody']",
-            "main article",
-            "[role='main'] article",
-            "main",
-            "[role='main']",
-            "article",
-            ".article-content",
-            ".news-content",
-            ".post-content",
-        ]
-
         soups = [BeautifulSoup(content, "html.parser") for content in page_contents]
 
         if len(soups) == 0:
             return None
 
-        for candidate_selector in candidate_selectors:
+        for candidate_selector in STABLE_MAIN_SELECTOR_CANDIDATES:
             is_valid_for_all = all(
-                self._is_main_selector_candidate_valid(
+                is_main_selector_candidate_valid(
                     soup=soup,
                     selector=candidate_selector,
                 )
@@ -169,29 +141,3 @@ class ExtractSampleArticlesStep(
                 return candidate_selector
 
         return None
-
-    def _is_main_selector_candidate_valid(
-        self,
-        *,
-        soup: BeautifulSoup,
-        selector: str,
-    ) -> bool:
-        matched_nodes = soup.select(selector)
-        has_single_match = len(matched_nodes) == 1
-        if not has_single_match:
-            return False
-
-        matched_node = matched_nodes[0]
-        text_length = len(matched_node.get_text(" ", strip=True))
-        has_enough_text = text_length >= config.workflow_main_selector_min_text_length
-        if not has_enough_text:
-            return False
-
-        paragraph_count = len(matched_node.select("p"))
-        has_enough_paragraphs = (
-            paragraph_count >= config.workflow_main_selector_min_paragraph_count
-        )
-        if not has_enough_paragraphs:
-            return False
-
-        return True

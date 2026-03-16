@@ -5,7 +5,10 @@ from pydantic import BaseModel
 
 from application.ai.workflow.builder import WorkflowBuilder
 from application.ai.workflow.state import WorkflowState
-from core.errors import WorkflowLoopLimitExceededError
+from core.errors import (
+    WorkflowFunctionStepNotRegisteredError,
+    WorkflowLoopLimitExceededError,
+)
 from domain.ai.protocols import Agent
 
 pytestmark = pytest.mark.anyio
@@ -57,7 +60,7 @@ async def test_step_validator_retries_until_validation_passes() -> None:
     )
 
     step.add_validator(_validate_counter_reached_two)
-    step.set_validation_retries(1)
+    step.set_validation_retries(2)
 
     workflow = (
         WorkflowBuilder[_WorkflowState, str, _WorkflowDependency]
@@ -125,6 +128,19 @@ async def test_workflow_stops_when_loop_limit_is_exceeded() -> None:
 
     with pytest.raises(WorkflowLoopLimitExceededError):
         await workflow.execute_workflow()
+
+
+def test_builder_raises_typed_error_for_unregistered_function_step() -> None:
+    builder = WorkflowBuilder[_WorkflowState, str, _WorkflowDependency]()
+
+    def _unregistered_run(
+        _state: _WorkflowState,
+        _agent: Agent[str, _WorkflowDependency],
+    ) -> str:
+        return "ok"
+
+    with pytest.raises(WorkflowFunctionStepNotRegisteredError):
+        builder.add_starting_step(_unregistered_run)
 
 
 def _run_increment_step(state: _WorkflowState) -> str:

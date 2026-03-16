@@ -26,7 +26,7 @@ class WorkflowStep[S: WorkflowState, O: BaseModel | str, D](ABC):
     name: str
     state: S
     has_executed: bool
-    result: O
+    result: O | None
 
     def __init__(self, state: S, name: str | None = None) -> None:
         self.transitions: list[tuple[ConditionFunction[S], WorkflowStep[S, O, D]]] = []
@@ -34,6 +34,7 @@ class WorkflowStep[S: WorkflowState, O: BaseModel | str, D](ABC):
         self.validators: list[StepValidator[S, O]] = []
         self.validation_max_retries = config.workflow_step_default_validation_retries
         self.has_executed = False
+        self.result = None
         self.state = state
         self.name = name or self.__class__.__name__
         self.agent: Agent[O, D]
