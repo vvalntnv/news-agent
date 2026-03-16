@@ -8,6 +8,48 @@ from infrastructure.background_jobs.celery_enqueuer import CeleryBackgroundJobEn
 from infrastructure.background_jobs.tasks import media_download as task_module
 
 
+class _EnqueueResultStub:
+    def __init__(self, task_id: str | None) -> None:
+        self.id = task_id
+
+
+def test_enqueue_job_serializes_pydantic_payload(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    enqueuer = CeleryBackgroundJobEnqueuer()
+    payload = MediaDownloadJobPayload(source_urls=["https://example.com/video.mp4"])
+    media_download_job = celery_app.tasks["background_jobs.media_download"]
+    captured: dict[str, object] = {}
+
+    def _fake_apply_async(*, args: list[object], serializer: str) -> _EnqueueResultStub:
+        captured["args"] = args
+        captured["serializer"] = serializer
+        return _EnqueueResultStub(task_id="task-123")
+
+    monkeypatch.setattr(media_download_job, "apply_async", _fake_apply_async)
+
+    result = enqueuer.enqueue_job(media_download_job, payload)
+
+    assert result.task_id == "task-123"
+    assert captured["serializer"] == "json"
+    assert captured["args"] == [payload.model_dump_json()]
+
+
+def test_enqueue_job_raises_when_task_id_is_empty(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    enqueuer = CeleryBackgroundJobEnqueuer()
+    media_download_job = celery_app.tasks["background_jobs.media_download"]
+
+    def _fake_apply_async(*, args: list[object], serializer: str) -> _EnqueueResultStub:
+        return _EnqueueResultStub(task_id=None)
+
+    monkeypatch.setattr(media_download_job, "apply_async", _fake_apply_async)
+
+    with pytest.raises(RuntimeError, match="empty task id"):
+        enqueuer.enqueue_job(media_download_job, payload="raw-payload")
+
+
 def test_enqueuer_runs_media_job_in_eager_mode(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:

@@ -1,5 +1,6 @@
 from typing import Protocol, runtime_checkable
 
+from celery import Task
 from pydantic import BaseModel, ConfigDict
 
 from application.background_jobs.payloads import MediaDownloadJobPayload
@@ -17,3 +18,5 @@ class BackgroundJobEnqueuerProtocol(Protocol):
         self,
         payload: MediaDownloadJobPayload,
     ) -> EnqueuedBackgroundJob: ...
+
+    def enqueue_job(self, job: Task, payload: object) -> EnqueuedBackgroundJob: ...

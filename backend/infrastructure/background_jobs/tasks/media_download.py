@@ -1,4 +1,5 @@
 from celery.result import AsyncResult
+from celery import Task
 
 from application.background_jobs.payloads import (
     MediaDownloadJobPayload,
