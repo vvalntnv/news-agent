@@ -16,7 +16,7 @@ class PydanticAgentAIFactory(AIFactory):
     def __init__(self) -> None:
         self.history_processor = BasicHistoryProcessor()
 
-    def create_agent[O: (BaseModel, str), D](
+    def create_agent[O: BaseModel | str, D](
         self, config: AIConfiguration[O, D]
     ) -> Agent[O, D]:
         model_config = resolve_ai_model_config(config)
@@ -45,7 +45,7 @@ class PydanticAgentAIFactory(AIFactory):
             ),
         )
 
-    def _construct_pydantic_agent[O: (BaseModel, str), D](
+    def _construct_pydantic_agent[O: BaseModel | str, D](
         self,
         config: AIConfiguration[O, D],
         provider_name: str,

@@ -1,6 +1,6 @@
 from dataclasses import dataclass
 from enum import Enum
-from typing import Callable
+from typing import Callable, cast
 
 from pydantic import BaseModel
 
@@ -10,6 +10,7 @@ from application.ai.workflow.predefined.news_site_exploration import (
     NewsSiteExplorationState,
     build_news_site_exploration_workflow,
 )
+from application.ai.workflow.state import WorkflowState
 from application.ai.workflow.workflow import Workflow
 from domain.ai.protocols import Agent
 from domain.news.value_objects import ScrapeInformation
@@ -20,7 +21,7 @@ class PredefinedWorkflowName(str, Enum):
 
 
 @dataclass(frozen=True)
-class WorkflowDefinition[I: BaseModel, S: BaseModel, O: (BaseModel, str), D]:
+class WorkflowDefinition[I: BaseModel, S: WorkflowState, O: BaseModel | str, D]:
     name: PredefinedWorkflowName
     description: str
     input_type: type[I]
@@ -28,21 +29,50 @@ class WorkflowDefinition[I: BaseModel, S: BaseModel, O: (BaseModel, str), D]:
     factory: Callable[[I, Agent[O, D]], Workflow[S, O, D]]
 
 
+type GenericWorkflowDefinition = WorkflowDefinition[
+    BaseModel,
+    WorkflowState,
+    BaseModel | str,
+    object,
+]
+
+
 class PredefinedWorkflowRegistry:
     def __init__(self) -> None:
-        self._news_site_exploration_definition = WorkflowDefinition(
-            name=PredefinedWorkflowName.NEWS_SITE_EXPLORATION,
-            description=(
-                "Explores a news website and produces domain ScrapeInformation "
-                "including media selectors"
-            ),
-            input_type=NewsSiteExplorationInput,
-            output_type=ScrapeInformation,
-            factory=self._build_news_site_exploration,
+        self._definitions: dict[PredefinedWorkflowName, GenericWorkflowDefinition] = {}
+
+        self._register_definition(
+            WorkflowDefinition[
+                NewsSiteExplorationInput,
+                NewsSiteExplorationState,
+                ScrapeInformation,
+                NewsSiteExplorationDependencies,
+            ](
+                name=PredefinedWorkflowName.NEWS_SITE_EXPLORATION,
+                description=(
+                    "Explores a news website and produces domain ScrapeInformation "
+                    "including media selectors"
+                ),
+                input_type=NewsSiteExplorationInput,
+                output_type=ScrapeInformation,
+                factory=self._build_news_site_exploration,
+            )
         )
 
+    def _register_definition[I: BaseModel, S: WorkflowState, O: BaseModel | str, D](
+        self,
+        definition: WorkflowDefinition[I, S, O, D],
+    ) -> None:
+        is_already_registered = definition.name in self._definitions
+        if is_already_registered:
+            raise ValueError(
+                f"Workflow '{definition.name.value}' is already registered"
+            )
+
+        self._definitions[definition.name] = cast(GenericWorkflowDefinition, definition)
+
     def list_workflows(self) -> tuple[PredefinedWorkflowName, ...]:
-        return (PredefinedWorkflowName.NEWS_SITE_EXPLORATION,)
+        return tuple(self._definitions.keys())
 
     def create_news_site_exploration_workflow(
         self,
@@ -53,19 +83,25 @@ class PredefinedWorkflowRegistry:
         ScrapeInformation,
         NewsSiteExplorationDependencies,
     ]:
-        return self._news_site_exploration_definition.factory(input_data, agent)
+        generic_definition = self.get(PredefinedWorkflowName.NEWS_SITE_EXPLORATION)
+        definition = cast(
+            WorkflowDefinition[
+                NewsSiteExplorationInput,
+                NewsSiteExplorationState,
+                ScrapeInformation,
+                NewsSiteExplorationDependencies,
+            ],
+            generic_definition,
+        )
+        return definition.factory(input_data, agent)
 
     def get(
         self,
         workflow_name: PredefinedWorkflowName,
-    ) -> WorkflowDefinition[
-        NewsSiteExplorationInput,
-        NewsSiteExplorationState,
-        ScrapeInformation,
-        NewsSiteExplorationDependencies,
-    ]:
-        if workflow_name is PredefinedWorkflowName.NEWS_SITE_EXPLORATION:
-            return self._news_site_exploration_definition
+    ) -> GenericWorkflowDefinition:
+        definition = self._definitions.get(workflow_name)
+        if definition is not None:
+            return definition
 
         raise ValueError(f"Workflow '{workflow_name.value}' is not registered")
 

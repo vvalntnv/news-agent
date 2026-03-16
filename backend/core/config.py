@@ -93,6 +93,13 @@ class Config(BaseSettings):
     media_download_retry_base_backoff_seconds: float = 0.5
     media_download_retry_max_backoff_seconds: float = 10.0
     media_download_retry_jitter_ratio: float = 0.25
+    workflow_step_default_validation_retries: int = 0
+    workflow_max_execution_steps: int = 100
+    workflow_selector_max_child_combinators: int = 3
+    workflow_selector_disallow_positional_pseudo: bool = True
+    workflow_main_selector_min_text_length: int = 250
+    workflow_main_selector_min_paragraph_count: int = 2
+    workflow_main_selector_max_link_density_ratio: float = 0.6
     media_download_retryable_status_codes: tuple[int, ...] = Field(
         default_factory=lambda: (429, 502, 503, 504)
     )

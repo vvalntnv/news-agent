@@ -48,7 +48,7 @@ class UsageLimits(BaseModel):
     count_tokens_before_request: bool = False
 
 
-class AIConfiguration[O: (BaseModel, str), D](BaseModel):
+class AIConfiguration[O: BaseModel | str, D](BaseModel):
     model_config = ConfigDict(extra="forbid", arbitrary_types_allowed=True)
 
     model_name: str | None = None

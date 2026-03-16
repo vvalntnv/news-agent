@@ -38,7 +38,7 @@ class Toolset(Protocol):
 
 
 @runtime_checkable
-class Agent[O: (BaseModel, str), D](Protocol):
+class Agent[O: BaseModel | str, D](Protocol):
     output_type: type[O]
     dependencies_type: type[D]
     history_tracker: HistoryTrackerFunc
@@ -51,7 +51,7 @@ class Agent[O: (BaseModel, str), D](Protocol):
 
 
 class AIFactory(Protocol):
-    def create_agent[O: (BaseModel, str), D](
+    def create_agent[O: BaseModel | str, D](
         self,
         config: AIConfiguration[O, D],
     ) -> Agent[O, D]: ...
