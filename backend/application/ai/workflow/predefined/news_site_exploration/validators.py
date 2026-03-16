@@ -15,7 +15,6 @@ async def validate_scrape_information(
     state: NewsSiteExplorationState,
     result: ScrapeInformation,
 ) -> None:
-    _ = state
     is_result_valid = is_valid_scrape_information(result)
     if not is_result_valid:
         raise ValueError("ScrapeInformation is missing one or more required selectors")
