@@ -1,4 +1,5 @@
 from core.config import (
+    CelerySettings,
     Config,
     ModelConfigs,
     ModelDefinition,
@@ -71,3 +72,31 @@ def test_model_configs_returns_none_for_unknown_provider_or_model() -> None:
 
     assert unknown_provider is None
     assert unknown_model is None
+
+
+def test_celery_settings_defaults_are_json_safe() -> None:
+    celery_settings = CelerySettings()
+
+    assert celery_settings.broker_url == "redis://localhost:6379/0"
+    assert celery_settings.task_serializer == "json"
+    assert celery_settings.result_serializer == "json"
+    assert celery_settings.event_serializer == "json"
+    assert celery_settings.accept_content == ("json",)
+    assert celery_settings.result_accept_content == ("json",)
+    assert celery_settings.imports == (
+        "infrastructure.background_jobs.tasks.media_download",
+    )
+
+
+def test_config_supports_overridden_celery_settings() -> None:
+    celery_settings = CelerySettings(
+        task_always_eager=True,
+        task_eager_propagates=True,
+        broker_url="redis://localhost:6379/5",
+    )
+
+    settings = Config(celery=celery_settings)
+
+    assert settings.celery.task_always_eager is True
+    assert settings.celery.task_eager_propagates is True
+    assert settings.celery.broker_url == "redis://localhost:6379/5"
