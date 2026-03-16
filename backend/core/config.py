@@ -79,6 +79,29 @@ class ModelConfigs(BaseModel):
         return None
 
 
+class CelerySettings(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    broker_url: str = "redis://localhost:6379/0"
+    result_backend: str | None = None
+    task_always_eager: bool = False
+    task_eager_propagates: bool = False
+    task_store_eager_result: bool = False
+    task_ignore_result: bool = True
+    task_acks_late: bool = False
+    worker_prefetch_multiplier: int = 4
+    result_expires_seconds: int = 3600
+    task_soft_time_limit_seconds: int | None = None
+    task_time_limit_seconds: int | None = None
+    task_serializer: str = "json"
+    result_serializer: str = "json"
+    event_serializer: str = "json"
+    accept_content: tuple[str, ...] = ("json",)
+    result_accept_content: tuple[str, ...] = ("json",)
+    broker_connection_retry_on_startup: bool = True
+    imports: tuple[str, ...] = ("infrastructure.background_jobs.tasks.media_download",)
+
+
 class Config(BaseSettings):
     model_config = SettingsConfigDict(env_nested_delimiter="__")
 
@@ -137,6 +160,7 @@ class Config(BaseSettings):
     model_configs_file_path: Path = Path("model_config.yaml")
 
     models: ModelConfigs | None = None
+    celery: CelerySettings = Field(default_factory=CelerySettings)
 
     def model_post_init(self, __context: object) -> None:
         _ = __context
